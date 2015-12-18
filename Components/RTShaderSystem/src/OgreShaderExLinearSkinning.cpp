@@ -100,7 +100,7 @@ bool LinearSkinning::resolveParameters(ProgramSet* programSet)
 		(mParamOutPositionProj.get() != NULL);
 
 
-	if (mDoBoneCalculations == true && mBoneCount > 0)
+	if (mDoBoneCalculations == true && mBoneCount > 1)
 	{
 		//local param
 		mParamLocalPositionWorld = vsMain->resolveLocalParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_WORLD_SPACE, GCT_FLOAT4);
@@ -190,7 +190,7 @@ void LinearSkinning::addPositionCalculations(Function* vsMain, int& funcCounter)
 {
 	FunctionInvocation* curFuncInvocation = NULL;
 
-	if (mDoBoneCalculations == true && mBoneCount > 0)
+	if (mDoBoneCalculations == true && mBoneCount > 1)
 	{
 		//set functions to calculate world position
 		for(int i = 0 ; i < getWeightCount() ; ++i)
@@ -243,7 +243,7 @@ void LinearSkinning::addNormalRelatedCalculations(Function* vsMain,
 {
 	FunctionInvocation* curFuncInvocation;
 
-	if (mDoBoneCalculations == true && mBoneCount > 0)
+	if (mDoBoneCalculations == true && mBoneCount > 1)
 	{
 		//set functions to calculate world normal
 		for(int i = 0 ; i < getWeightCount() ; ++i)
