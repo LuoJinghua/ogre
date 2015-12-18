@@ -100,7 +100,7 @@ bool LinearSkinning::resolveParameters(ProgramSet* programSet)
 		(mParamOutPositionProj.get() != NULL);
 
 
-	if (mDoBoneCalculations == true)
+	if (mDoBoneCalculations == true && mBoneCount > 0)
 	{
 		//local param
 		mParamLocalPositionWorld = vsMain->resolveLocalParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_WORLD_SPACE, GCT_FLOAT4);
@@ -120,9 +120,14 @@ bool LinearSkinning::resolveParameters(ProgramSet* programSet)
 		mParamInIndices = vsMain->resolveInputParameter(Parameter::SPS_BLEND_INDICES, 0, Parameter::SPC_UNKNOWN, GCT_FLOAT4);
 		mParamInWeights = vsMain->resolveInputParameter(Parameter::SPS_BLEND_WEIGHTS, 0, Parameter::SPC_UNKNOWN, GCT_FLOAT4);
 		if (ShaderGenerator::getSingleton().getTargetLanguage() == "glsles")
-			mParamInWorldMatrices = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_WORLD_MATRIX_ARRAY, 0, mBoneCount);
+		{
+			int boneCount = ((mBoneCount / 16) + 1) * 16;
+			mParamInWorldMatrices = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_WORLD_MATRIX_ARRAY, 0, boneCount);
+		}
 		else
+		{
 			mParamInWorldMatrices = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_WORLD_MATRIX_ARRAY_3x4, 0, mBoneCount);
+		}
 		mParamInInvWorldMatrix = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_INVERSE_WORLD_MATRIX, 0);
 		mParamInViewProjMatrix = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_VIEWPROJ_MATRIX, 0);
 
@@ -185,7 +190,7 @@ void LinearSkinning::addPositionCalculations(Function* vsMain, int& funcCounter)
 {
 	FunctionInvocation* curFuncInvocation = NULL;
 
-	if (mDoBoneCalculations == true)
+	if (mDoBoneCalculations == true && mBoneCount > 0)
 	{
 		//set functions to calculate world position
 		for(int i = 0 ; i < getWeightCount() ; ++i)
@@ -238,7 +243,7 @@ void LinearSkinning::addNormalRelatedCalculations(Function* vsMain,
 {
 	FunctionInvocation* curFuncInvocation;
 
-	if (mDoBoneCalculations == true)
+	if (mDoBoneCalculations == true && mBoneCount > 0)
 	{
 		//set functions to calculate world normal
 		for(int i = 0 ; i < getWeightCount() ; ++i)
