@@ -276,7 +276,9 @@ bool PerPixelLighting::resolveGlobalParameters(ProgramSet* programSet)
 	mSurfaceShininess = psProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_SURFACE_SHININESS, 0);
 
 	// Resolve input vertex shader normal.
-	mVSInNormal = vsMain->resolveInputParameter(Parameter::SPS_NORMAL, 0, Parameter::SPC_NORMAL_OBJECT_SPACE, GCT_FLOAT3);
+	mVSInNormal = vsMain->getParameterByName(vsMain->getLocalParameters(), "transformedNormal");
+	if (mVSInNormal.get() == NULL)
+		mVSInNormal = vsMain->resolveInputParameter(Parameter::SPS_NORMAL, 0, Parameter::SPC_NORMAL_OBJECT_SPACE, GCT_FLOAT3);
 
 	// Resolve output vertex shader normal.
 	mVSOutNormal = vsMain->resolveOutputParameter(Parameter::SPS_TEXTURE_COORDINATES, -1, Parameter::SPC_NORMAL_VIEW_SPACE, GCT_FLOAT3);
@@ -312,7 +314,9 @@ bool PerPixelLighting::resolveGlobalParameters(ProgramSet* programSet)
 
 		mPSTempSpecularColour = psMain->resolveLocalParameter(Parameter::SPS_UNKNOWN, 0, "lPerPixelSpecular", GCT_FLOAT4);
 
-		mVSInPosition = vsMain->resolveInputParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
+		mVSInPosition = vsMain->getParameterByName(vsMain->getLocalParameters(), "transformedPosition");
+		if (mVSInPosition.get() == NULL)
+			mVSInPosition = vsMain->resolveInputParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
 
 		mVSOutViewPos = vsMain->resolveOutputParameter(Parameter::SPS_TEXTURE_COORDINATES, -1, Parameter::SPC_POSITION_VIEW_SPACE, GCT_FLOAT3);
 
@@ -356,7 +360,9 @@ bool PerPixelLighting::resolvePerLightParameters(ProgramSet* programSet)
 
 		case Light::LT_POINT:
 			mWorldViewMatrix = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_WORLDVIEW_MATRIX, 0);
-			mVSInPosition = vsMain->resolveInputParameter(Parameter::SPS_POSITION, 0,  Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
+			mVSInPosition = vsMain->getParameterByName(vsMain->getLocalParameters(), "transformedPosition");
+			if (mVSInPosition.get() == NULL)
+				mVSInPosition = vsMain->resolveInputParameter(Parameter::SPS_POSITION, 0,  Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
 			mLightParamsList[i].mPosition = psProgram->resolveParameter(GCT_FLOAT4, -1, (uint16)GPV_LIGHTS, "light_position_view_space");
 			mLightParamsList[i].mAttenuatParams = psProgram->resolveParameter(GCT_FLOAT4, -1, (uint16)GPV_LIGHTS, "light_attenuation");
 			
@@ -378,7 +384,9 @@ bool PerPixelLighting::resolvePerLightParameters(ProgramSet* programSet)
 		case Light::LT_SPOTLIGHT:
 			mWorldViewMatrix = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_WORLDVIEW_MATRIX, 0);
 
-			mVSInPosition = vsMain->resolveInputParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
+			mVSInPosition = vsMain->getParameterByName(vsMain->getLocalParameters(), "transformedPosition");
+			if (mVSInPosition.get() == NULL)
+				mVSInPosition = vsMain->resolveInputParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
 			mLightParamsList[i].mPosition = psProgram->resolveParameter(GCT_FLOAT4, -1, (uint16)GPV_LIGHTS, "light_position_view_space");
 			mLightParamsList[i].mDirection = psProgram->resolveParameter(GCT_FLOAT4, -1, (uint16)GPV_LIGHTS, "light_direction_view_space");
 			mLightParamsList[i].mAttenuatParams = psProgram->resolveParameter(GCT_FLOAT4, -1, (uint16)GPV_LIGHTS, "light_attenuation");
