@@ -210,16 +210,19 @@ void LinearSkinning::addPositionCalculations(Function* vsMain, int& funcCounter)
 			addIndexedPositionWeight(vsMain, i, funcCounter);
 		}
 
-		//update back the original position relative to the object
-		curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM, funcCounter++);
-		curFuncInvocation->pushOperand(mParamInInvWorldMatrix, Operand::OPS_IN);
-		curFuncInvocation->pushOperand(mParamLocalPositionWorld, Operand::OPS_IN);
-		if (ShaderGenerator::getSingleton().getTargetLanguage() == "glsles")
-			curFuncInvocation->pushOperand(mParamTransformedVertex, Operand::OPS_OUT);
-		else
-			curFuncInvocation->pushOperand(mParamInPosition, Operand::OPS_OUT);
+		if (mDoNormalCalculations)
+		{
+			//update back the original position relative to the object
+			curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM, funcCounter++);
+			curFuncInvocation->pushOperand(mParamInInvWorldMatrix, Operand::OPS_IN);
+			curFuncInvocation->pushOperand(mParamLocalPositionWorld, Operand::OPS_IN);
+			if (ShaderGenerator::getSingleton().getTargetLanguage() == "glsles")
+				curFuncInvocation->pushOperand(mParamTransformedVertex, Operand::OPS_OUT);
+			else
+				curFuncInvocation->pushOperand(mParamInPosition, Operand::OPS_OUT);
 
-		vsMain->addAtomInstance(curFuncInvocation);
+			vsMain->addAtomInstance(curFuncInvocation);
+		}
 
 		//update the projective position thereby filling the transform stage role
 		curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM, funcCounter++);
