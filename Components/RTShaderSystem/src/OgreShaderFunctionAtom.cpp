@@ -267,6 +267,64 @@ bool FunctionInvocation::operator < ( const FunctionInvocation& rhs ) const
     return FunctionInvocationLessThan()(*this, rhs);
 }
 
+static GpuConstantType getIndirectType(GpuConstantType type, int level = 1)
+{
+    static GpuConstantType indirectTypes[] = {
+        GCT_UNKNOWN,
+        GCT_FLOAT1,
+        GCT_FLOAT1,
+        GCT_FLOAT1,
+        GCT_FLOAT1,
+        GCT_UNKNOWN,
+        GCT_UNKNOWN,
+        GCT_UNKNOWN,
+        GCT_UNKNOWN,
+        GCT_UNKNOWN,
+        GCT_UNKNOWN,
+        GCT_UNKNOWN,
+        GCT_UNKNOWN,
+        GCT_FLOAT2,
+        GCT_FLOAT3,
+        GCT_FLOAT4,
+        GCT_FLOAT2,
+        GCT_FLOAT3,
+        GCT_FLOAT4,
+        GCT_FLOAT2,
+        GCT_FLOAT3,
+        GCT_FLOAT4,
+        GCT_INT1,
+        GCT_INT1,
+        GCT_INT1,
+        GCT_INT1,
+        GCT_UNKNOWN,
+        GCT_DOUBLE1,
+        GCT_DOUBLE1,
+        GCT_DOUBLE1,
+        GCT_DOUBLE1,
+        GCT_DOUBLE2,
+        GCT_DOUBLE3,
+        GCT_DOUBLE4,
+        GCT_DOUBLE2,
+        GCT_DOUBLE3,
+        GCT_DOUBLE4,
+        GCT_DOUBLE2,
+        GCT_DOUBLE3,
+        GCT_DOUBLE4,
+        GCT_DOUBLE2,
+        GCT_DOUBLE3,
+        GCT_DOUBLE4,
+        GCT_UNKNOWN
+    };
+    if (level == 0)
+        return type;
+    while (level > 0)
+    {
+        type = indirectTypes[type];
+        level--;
+    }
+    return type;
+}
+
 bool FunctionInvocation::FunctionInvocationLessThan::operator ()(FunctionInvocation const& lhs, FunctionInvocation const& rhs) const
 {
     // Check the function names first
@@ -295,10 +353,10 @@ bool FunctionInvocation::FunctionInvocationLessThan::operator ()(FunctionInvocat
         return false;
 
     // Check the number of operands
-    if (lhs.mOperands.size() < rhs.mOperands.size())
-        return true;
-    if (lhs.mOperands.size() > rhs.mOperands.size())
-        return false;
+    //if (lhs.mOperands.size() < rhs.mOperands.size())
+    //    return true;
+    //if (lhs.mOperands.size() > rhs.mOperands.size())
+    //    return false;
 
     // Now that we've gotten past the two quick tests, iterate over operands
     // Check the semantic and type.  The operands must be in the same order as well.
@@ -324,6 +382,49 @@ bool FunctionInvocation::FunctionInvocationLessThan::operator ()(FunctionInvocat
                 rightType = GCT_SAMPLER2D;
         }
 
+        OperandVector::const_iterator nextItLHSOps = itLHSOps + 1;
+        int lhsIndLevel = 0;
+        if (nextItLHSOps != lhs.mOperands.end() &&
+            nextItLHSOps->getIndirectionLevel() > 0)
+        {
+            while (nextItLHSOps != lhs.mOperands.end() &&
+                   nextItLHSOps->getIndirectionLevel() > 0)
+                nextItLHSOps++;
+            if (nextItLHSOps == lhs.mOperands.end() ||
+                nextItLHSOps->getIndirectionLevel() == 0)
+                nextItLHSOps--;
+            lhsIndLevel = nextItLHSOps->getIndirectionLevel();
+        }
+        else
+        {
+            nextItLHSOps = lhs.mOperands.end();
+        }
+        
+        if (itLHSOps->getParameter()->getSize() > 0 && lhsIndLevel > 0)
+            lhsIndLevel--;
+        leftType = getIndirectType(leftType, lhsIndLevel);
+
+        OperandVector::const_iterator nextItRHSOps = itRHSOps + 1;
+        int rhsIndLevel = 0;
+        if (nextItRHSOps != rhs.mOperands.end() &&
+            nextItRHSOps->getIndirectionLevel() > 0)
+        {
+            while (nextItRHSOps != rhs.mOperands.end() &&
+                   nextItRHSOps->getIndirectionLevel() > 0)
+                nextItRHSOps++;
+            if (nextItRHSOps == rhs.mOperands.end() ||
+                nextItRHSOps->getIndirectionLevel() == 0)
+                nextItRHSOps--;
+            rhsIndLevel = nextItRHSOps->getIndirectionLevel();
+        }
+        else
+        {
+            nextItRHSOps = rhs.mOperands.end();
+        }
+        if (itRHSOps->getParameter()->getSize() > 0 && rhsIndLevel > 0)
+            rhsIndLevel--;
+        rightType = getIndirectType(rightType, rhsIndLevel);
+
         // If a swizzle mask is being applied to the parameter, generate the GpuConstantType to
         // perform the parameter type comparison the way that the compiler will see it.
         if ((itLHSOps->getFloatCount(itLHSOps->getMask()) > 0) ||
@@ -331,13 +432,11 @@ bool FunctionInvocation::FunctionInvocationLessThan::operator ()(FunctionInvocat
         {
             if (itLHSOps->getFloatCount(itLHSOps->getMask()) > 0)
             {
-                leftType = (GpuConstantType)((itLHSOps->getParameter()->getType() - itLHSOps->getParameter()->getType()) +
-                                             itLHSOps->getFloatCount(itLHSOps->getMask()));
+                leftType = (GpuConstantType)(itLHSOps->getFloatCount(itLHSOps->getMask()));
             }
             if (itRHSOps->getFloatCount(itRHSOps->getMask()) > 0)
             {
-                rightType = (GpuConstantType)((itRHSOps->getParameter()->getType() - itRHSOps->getParameter()->getType()) +
-                                             itRHSOps->getFloatCount(itRHSOps->getMask()));
+                rightType = (GpuConstantType)(itRHSOps->getFloatCount(itRHSOps->getMask()));
             }
         }
 
@@ -345,7 +444,17 @@ bool FunctionInvocation::FunctionInvocationLessThan::operator ()(FunctionInvocat
             return true;
         if (leftType > rightType)
             return false;
+
+        if (nextItLHSOps != lhs.mOperands.end())
+            itLHSOps = nextItLHSOps;
+        if (nextItRHSOps != rhs.mOperands.end())
+            itRHSOps = nextItRHSOps;
     }
+
+    if (itLHSOps == lhs.mOperands.end() && itRHSOps != rhs.mOperands.end())
+        return true;
+    if (itLHSOps != lhs.mOperands.end() && itRHSOps == rhs.mOperands.end())
+        return false;
 
     return false;
 }
@@ -361,8 +470,8 @@ bool FunctionInvocation::FunctionInvocationCompare::operator ()(FunctionInvocati
         return false;
 
     // Check the number of operands
-    if (lhs.mOperands.size() != rhs.mOperands.size())
-        return false;
+    // if (lhs.mOperands.size() != rhs.mOperands.size())
+    //    return false;
 
     // Now that we've gotten past the two quick tests, iterate over operands
     // Check the semantic and type.  The operands must be in the same order as well.
@@ -385,6 +494,49 @@ bool FunctionInvocation::FunctionInvocationCompare::operator ()(FunctionInvocati
                 rightType = GCT_SAMPLER2D;
         }
 
+        OperandVector::const_iterator nextItLHSOps = itLHSOps + 1;
+        int lhsIndLevel = 0;
+        if (nextItLHSOps != lhs.mOperands.end() &&
+            nextItLHSOps->getIndirectionLevel() > 0)
+        {
+            while (nextItLHSOps != lhs.mOperands.end() &&
+                   nextItLHSOps->getIndirectionLevel() > 0)
+                nextItLHSOps++;
+            if (nextItLHSOps == lhs.mOperands.end() ||
+                nextItLHSOps->getIndirectionLevel() == 0)
+                nextItLHSOps--;
+            lhsIndLevel = nextItLHSOps->getIndirectionLevel();
+        }
+        else
+        {
+            nextItLHSOps = lhs.mOperands.end();
+        }
+
+        if (itLHSOps->getParameter()->getSize() > 0 && lhsIndLevel > 0)
+            lhsIndLevel--;
+        leftType = getIndirectType(leftType, lhsIndLevel);
+
+        OperandVector::const_iterator nextItRHSOps = itRHSOps + 1;
+        int rhsIndLevel = 0;
+        if (nextItRHSOps != rhs.mOperands.end() &&
+            nextItRHSOps->getIndirectionLevel() > 0)
+        {
+            while (nextItRHSOps != rhs.mOperands.end() &&
+                   nextItRHSOps->getIndirectionLevel() > 0)
+                nextItRHSOps++;
+            if (nextItRHSOps == rhs.mOperands.end() ||
+                nextItRHSOps->getIndirectionLevel() == 0)
+                nextItRHSOps--;
+            rhsIndLevel = nextItRHSOps->getIndirectionLevel();
+        }
+        else
+        {
+            nextItRHSOps = rhs.mOperands.end();
+        }
+        if (itRHSOps->getParameter()->getSize() > 0 && rhsIndLevel > 0)
+            rhsIndLevel--;
+        rightType = getIndirectType(rightType, rhsIndLevel);
+
         // If a swizzle mask is being applied to the parameter, generate the GpuConstantType to
         // perform the parameter type comparison the way that the compiler will see it.
         if ((itLHSOps->getFloatCount(itLHSOps->getMask()) > 0) ||
@@ -392,19 +544,25 @@ bool FunctionInvocation::FunctionInvocationCompare::operator ()(FunctionInvocati
         {
             if (itLHSOps->getFloatCount(itLHSOps->getMask()) > 0)
             {
-                leftType = (GpuConstantType)((itLHSOps->getParameter()->getType() - itLHSOps->getParameter()->getType()) +
-                                             itLHSOps->getFloatCount(itLHSOps->getMask()));
+                leftType = (GpuConstantType)(itLHSOps->getFloatCount(itLHSOps->getMask()));
             }
             if (itRHSOps->getFloatCount(itRHSOps->getMask()) > 0)
             {
-                rightType = (GpuConstantType)((itRHSOps->getParameter()->getType() - itRHSOps->getParameter()->getType()) +
-                                             itRHSOps->getFloatCount(itRHSOps->getMask()));
+                rightType = (GpuConstantType)(itRHSOps->getFloatCount(itRHSOps->getMask()));
             }
         }
 
         if (leftType != rightType)
             return false;
+
+        if (nextItLHSOps != lhs.mOperands.end())
+            itLHSOps = nextItLHSOps;
+        if (nextItRHSOps != rhs.mOperands.end())
+            itRHSOps = nextItRHSOps;
     }
+
+    if (itLHSOps != lhs.mOperands.end() || itRHSOps != rhs.mOperands.end())
+        return false;
 
     // Passed all tests, they are the same
     return true;
