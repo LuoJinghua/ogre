@@ -199,6 +199,7 @@ bool HardwareSkinning::preAddToRenderState(const RenderState* renderState, Pass*
 		((mCreator == NULL) || (boneCount <= mCreator->getMaxCalculableBoneCount()));
 
 	mActiveTechnique->setDoBoneCalculations(doBoneCalculations);
+	mActiveTechnique->setDoNormalCalculations(srcPass->getLightingEnabled());
 
 	if ((doBoneCalculations) && (mCreator))
 	{

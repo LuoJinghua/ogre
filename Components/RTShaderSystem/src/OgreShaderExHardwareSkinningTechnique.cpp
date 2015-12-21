@@ -54,7 +54,8 @@ HardwareSkinningTechnique::HardwareSkinningTechnique() :
 	mWeightCount(0),
 	mCorrectAntipodalityHandling(false),
 	mScalingShearingSupport(false),
-	mDoBoneCalculations(false)
+	mDoBoneCalculations(false),
+	mDoNormalCalculations(false)
 {
 }
 
@@ -76,6 +77,12 @@ void HardwareSkinningTechnique::setHardwareSkinningParam(ushort boneCount, ushor
 void HardwareSkinningTechnique::setDoBoneCalculations(bool doBoneCalculations)
 {
 	mDoBoneCalculations = doBoneCalculations;
+}
+
+//-----------------------------------------------------------------------
+void HardwareSkinningTechnique::setDoNormalCalculations(bool doNormalCalculations)
+{
+	mDoNormalCalculations = doNormalCalculations;
 }
 
 //-----------------------------------------------------------------------
@@ -121,6 +128,7 @@ void HardwareSkinningTechnique::copyFrom(const HardwareSkinningTechnique* hardSk
 	mWeightCount = hardSkin->mWeightCount;
 	mBoneCount = hardSkin->mBoneCount;
 	mDoBoneCalculations = hardSkin->mDoBoneCalculations;
+	mDoNormalCalculations = hardSkin->mDoNormalCalculations;
 	mCorrectAntipodalityHandling = hardSkin->mCorrectAntipodalityHandling;
 	mScalingShearingSupport = hardSkin->mScalingShearingSupport;
 }

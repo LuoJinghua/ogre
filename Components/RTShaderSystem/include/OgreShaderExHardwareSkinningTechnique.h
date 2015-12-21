@@ -99,6 +99,10 @@ public:
 	void setDoBoneCalculations(bool doBoneCalculations);
 
 	/**
+	*/
+	void setDoNormalCalculations(bool doNormalCalculations);
+
+	/**
 	@see SubRenderState::resolveParameters.
 	*/
 	virtual bool resolveParameters(ProgramSet* programSet) = 0;
@@ -126,6 +130,7 @@ protected:
 	bool mScalingShearingSupport;
 
 	bool mDoBoneCalculations;
+	bool mDoNormalCalculations;
 	
 	ParameterPtr mParamInPosition;
 	ParameterPtr mParamInNormal;
@@ -146,6 +151,8 @@ protected:
 	//ParameterPtr mParamLocalTangentWorld;
 	//ParameterPtr mParamLocalBinormalWorld;
 	ParameterPtr mParamOutPositionProj;
+	ParameterPtr mParamTransformedNormal;
+	ParameterPtr mParamTransformedVertex;
 };
 
 }
