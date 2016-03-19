@@ -136,11 +136,10 @@ namespace Ogre {
 
                 case PF_ETC1_RGB8:
                 case PF_ETC2_RGB8:
-                case PF_ETC2_RGBA8:
                 case PF_ETC2_RGB8A1:
-                    return ((width * height) >> 1);
                 case PF_ATC_RGB:
                     return ((width + 3) / 4) * ((height + 3) / 4) * 8;
+                case PF_ETC2_RGBA8:
                 case PF_ATC_RGBA_EXPLICIT_ALPHA:
                 case PF_ATC_RGBA_INTERPOLATED_ALPHA:
                     return ((width + 3) / 4) * ((height + 3) / 4) * 16;
