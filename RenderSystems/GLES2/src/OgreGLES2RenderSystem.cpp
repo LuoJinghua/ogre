@@ -617,6 +617,10 @@ namespace Ogre {
             }
             mNativeShadingLanguageVersion = (StringConverter::parseUnsignedInt(tokens[i]) * 100) + StringConverter::parseUnsignedInt(tokens[i+1]);
 
+#if OGRE_NO_GLES3_SUPPORT == 1
+            if (mNativeShadingLanguageVersion >= 300)
+                mNativeShadingLanguageVersion = 100;
+#endif
 
 			// Initialise GL after the first window has been created
 			// TODO: fire this from emulation options, and don't duplicate Real and Current capabilities
