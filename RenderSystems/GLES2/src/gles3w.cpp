@@ -37,7 +37,7 @@ static void *get_proc(const char *proc)
 // From http://stackoverflow.com/questions/478898/how-to-execute-a-command-and-get-output-of-command-within-c
 std::string exec(const char* cmd) {
     FILE* pipe = popen(cmd, "r");
-    if (!pipe) return "ERROR";
+    if (!pipe) return "";
     char buffer[128];
     std::string result = "";
     while(!feof(pipe)) {
@@ -57,15 +57,17 @@ static void open_libgl(void)
     NSString *sysVersion = [UIDevice currentDevice].systemVersion;
     NSArray *sysVersionComponents = [sysVersion componentsSeparatedByString:@"."];
 
-    BOOL isSimulator = ([[UIDevice currentDevice].model rangeOfString:@"Simulator"].location != NSNotFound);
-    if(isSimulator)
+#if TARGET_IPHONE_SIMULATOR
     {
         // Ask where Xcode is installed
         std::string xcodePath = "/Applications/Xcode.app/Contents/Developer\n";
 
         // The result contains an end line character. Remove it.
         size_t pos = xcodePath.find("\n");
-        xcodePath.erase(pos);
+        if (pos != std::string::npos)
+            xcodePath.erase(pos);
+        if (xcodePath.empty())
+            xcodePath = "/Applications/Xcode.app/Contents/Developer";
 
         char tempPath[PATH_MAX];
         sprintf(tempPath,
@@ -75,6 +77,7 @@ static void open_libgl(void)
                 [[sysVersionComponents objectAtIndex:1] cStringUsingEncoding:NSUTF8StringEncoding]);
         frameworkPath = CFStringCreateWithCString(kCFAllocatorDefault, tempPath, kCFStringEncodingUTF8);
     }
+#endif
 
 	bundleURL = CFURLCreateWithFileSystemPath(kCFAllocatorDefault,
                                               frameworkPath,
