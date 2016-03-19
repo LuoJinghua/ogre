@@ -1158,43 +1158,73 @@ namespace Ogre {
     {
         mGLInternalFormat = format;
         mNumSamples = numSamples;
-        
-        // Generate renderbuffer
-        OGRE_CHECK_GL_ERROR(glGenRenderbuffers(1, &mRenderbufferID));
-        if(getGLES2SupportRef()->checkExtension("GL_EXT_debug_label"))
-        {
-            OGRE_IF_IOS_VERSION_IS_GREATER_THAN(5.0)
-            OGRE_CHECK_GL_ERROR(glLabelObjectEXT(GL_BUFFER_OBJECT_EXT, mRenderbufferID, 0, ("RB " + StringConverter::toString(mRenderbufferID) + " MSAA: " + StringConverter::toString(mNumSamples)).c_str()));
-        }
 
-        // Bind it to FBO
-        OGRE_CHECK_GL_ERROR(glBindRenderbuffer(GL_RENDERBUFFER, mRenderbufferID));
-
-        // Allocate storage for depth buffer
-        if (mNumSamples > 0)
+        if (format == GL_DEPTH_COMPONENT)
         {
-            if(getGLES2SupportRef()->checkExtension("GL_APPLE_framebuffer_multisample") || gleswIsSupported(3, 0))
-            {
-                OGRE_CHECK_GL_ERROR(glRenderbufferStorageMultisampleAPPLE(GL_RENDERBUFFER,
-                                                                          mNumSamples, mGLInternalFormat, mWidth, mHeight));
-            }
+            OGRE_CHECK_GL_ERROR(glGenTextures(1, &mRenderbufferID));
+
+            getGLES2SupportRef()->getStateCacheManager()->bindGLTexture(GL_TEXTURE_2D, mRenderbufferID);
+            getGLES2SupportRef()->getStateCacheManager()->setTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            getGLES2SupportRef()->getStateCacheManager()->setTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            getGLES2SupportRef()->getStateCacheManager()->setTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            getGLES2SupportRef()->getStateCacheManager()->setTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            getGLES2SupportRef()->getStateCacheManager()->setTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_EXT, GL_COMPARE_REF_TO_TEXTURE_EXT);
+            getGLES2SupportRef()->getStateCacheManager()->setTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC_EXT, GL_LEQUAL);
+            OGRE_CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+                                             width, height, 0, GL_DEPTH_COMPONENT,
+                                             GL_UNSIGNED_INT, 0));
         }
         else
         {
-            OGRE_CHECK_GL_ERROR(glRenderbufferStorage(GL_RENDERBUFFER, mGLInternalFormat,
-                                                      mWidth, mHeight));
+            // Generate renderbuffer
+            OGRE_CHECK_GL_ERROR(glGenRenderbuffers(1, &mRenderbufferID));
+            if(getGLES2SupportRef()->checkExtension("GL_EXT_debug_label"))
+            {
+                OGRE_IF_IOS_VERSION_IS_GREATER_THAN(5.0)
+                OGRE_CHECK_GL_ERROR(glLabelObjectEXT(GL_BUFFER_OBJECT_EXT, mRenderbufferID, 0, ("RB " + StringConverter::toString(mRenderbufferID) + " MSAA: " + StringConverter::toString(mNumSamples)).c_str()));
+            }
+
+            // Bind it to FBO
+            OGRE_CHECK_GL_ERROR(glBindRenderbuffer(GL_RENDERBUFFER, mRenderbufferID));
+
+            // Allocate storage for depth buffer
+            if (mNumSamples > 0)
+            {
+                if(getGLES2SupportRef()->checkExtension("GL_APPLE_framebuffer_multisample") || gleswIsSupported(3, 0))
+                {
+                    OGRE_CHECK_GL_ERROR(glRenderbufferStorageMultisampleAPPLE(GL_RENDERBUFFER,
+                                                                              mNumSamples, mGLInternalFormat, mWidth, mHeight));
+                }
+            }
+            else
+            {
+                OGRE_CHECK_GL_ERROR(glRenderbufferStorage(GL_RENDERBUFFER, mGLInternalFormat,
+                                                          mWidth, mHeight));
+            }
         }
     }
     //----------------------------------------------------------------------------- 
     GLES2RenderBuffer::~GLES2RenderBuffer()
     {
-        OGRE_CHECK_GL_ERROR(glDeleteRenderbuffers(1, &mRenderbufferID));
+        if (mGLInternalFormat == GL_DEPTH_COMPONENT)
+            getGLES2SupportRef()->getStateCacheManager()->deleteGLBuffer(GL_TEXTURE_2D, mRenderbufferID,
+                                                                         GL_DEPTH_ATTACHMENT);
+        else
+            OGRE_CHECK_GL_ERROR(glDeleteRenderbuffers(1, &mRenderbufferID));
     }
     //-----------------------------------------------------------------------------  
     void GLES2RenderBuffer::bindToFramebuffer(GLenum attachment, size_t zoffset)
     {
         assert(zoffset < mDepth);
-        OGRE_CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachment,
-                                                      GL_RENDERBUFFER, mRenderbufferID));
+        if (mGLInternalFormat == GL_DEPTH_COMPONENT)
+        {
+            OGRE_CHECK_GL_ERROR(glFramebufferTexture2D(GL_FRAMEBUFFER, attachment,
+                                                       GL_TEXTURE_2D, mRenderbufferID, 0));
+        }
+        else
+        {
+            OGRE_CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_FRAMEBUFFER, attachment,
+                                                          GL_RENDERBUFFER, mRenderbufferID));
+        }
     }
 }

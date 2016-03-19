@@ -138,6 +138,7 @@ namespace Ogre {
 #if OGRE_NO_GLES3_SUPPORT == 0
         , GL_DEPTH32F_STENCIL8
 #endif
+        , GL_DEPTH_COMPONENT
     };
     static const size_t depthBits[] =
     {
@@ -149,6 +150,7 @@ namespace Ogre {
 #if OGRE_NO_GLES3_SUPPORT == 0
         ,32
 #endif
+        ,32
     };
     #define DEPTHFORMAT_COUNT (sizeof(depthFormats)/sizeof(GLenum))
 
@@ -217,21 +219,48 @@ namespace Ogre {
     GLuint GLES2FBOManager::_tryFormat(GLenum depthFormat, GLenum stencilFormat)
     {
         GLuint status, depthRB = 0, stencilRB = 0;
+        GLuint depthTex = 0;
 
         if(depthFormat != GL_NONE)
         {
-            // Generate depth renderbuffer
-            glGenRenderbuffers(1, &depthRB);
+            if (depthFormat == GL_DEPTH_COMPONENT)
+            {
+                // Generate depth texture
+                glGenTextures(1, &depthTex);
 
-            // Bind it to FBO
-            glBindRenderbuffer(GL_RENDERBUFFER, depthRB);
+                // Bind it to FBO
+                glBindTexture(GL_TEXTURE_2D, depthTex);
 
-            // Allocate storage for depth buffer
-            glRenderbufferStorage(GL_RENDERBUFFER, depthFormat,
-                                PROBE_SIZE, PROBE_SIZE);
+                // Allocate storage for depth buffer
+                glTexImage2D(GL_TEXTURE_2D, 0, depthFormat,
+                             PROBE_SIZE, PROBE_SIZE, 0,
+                             depthFormat, GL_UNSIGNED_INT, 0);
 
-            // Attach depth
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRB);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_EXT, GL_COMPARE_REF_TO_TEXTURE_EXT);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_FUNC_EXT, GL_LEQUAL);
+
+                // Attach depth
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
+            }
+            else
+            {
+                // Generate depth renderbuffer
+                glGenRenderbuffers(1, &depthRB);
+
+                // Bind it to FBO
+                glBindRenderbuffer(GL_RENDERBUFFER, depthRB);
+
+                // Allocate storage for depth buffer
+                glRenderbufferStorage(GL_RENDERBUFFER, depthFormat,
+                                    PROBE_SIZE, PROBE_SIZE);
+
+                // Attach depth
+                glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRB);
+            }
         }
 
         // Stencil buffers aren't available on iOS
@@ -258,6 +287,9 @@ namespace Ogre {
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
 
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
+
+        if (depthTex)
+            glDeleteTextures(1, &depthTex);
 
         if (depthRB)
             glDeleteRenderbuffers(1, &depthRB);
@@ -349,10 +381,12 @@ namespace Ogre {
                 for (size_t depth = 0; depth < DEPTHFORMAT_COUNT; ++depth)
                 {
 #if OGRE_NO_GLES3_SUPPORT == 1
-                    if (getGLES2SupportRef()->checkExtension("GL_OES_packed_depth_stencil") &&
-                        depthFormats[depth] != GL_DEPTH24_STENCIL8_OES)
+                    if ((getGLES2SupportRef()->checkExtension("GL_OES_packed_depth_stencil") &&
+                         depthFormats[depth] != GL_DEPTH24_STENCIL8_OES) ||
+                        depthFormats[depth] == GL_DEPTH_COMPONENT)
 #else
-                    if (depthFormats[depth] != GL_DEPTH24_STENCIL8 && depthFormats[depth] != GL_DEPTH32F_STENCIL8)
+                    if (depthFormats[depth] != GL_DEPTH24_STENCIL8 && depthFormats[depth] != GL_DEPTH32F_STENCIL8 &&
+                        depthFormats[depth] != GL_DEPTH_COMPONENT)
 #endif
                     {
                         // General depth/stencil combination
@@ -472,11 +506,19 @@ namespace Ogre {
                 bestmode = mode;
             }
         }
+	if (!props.modes.empty())
+	{
         *depthFormat = depthFormats[props.modes[bestmode].depth];
         if(requestDepthOnly)
             *stencilFormat = 0;
         else
             *stencilFormat = stencilFormats[props.modes[bestmode].stencil];
+	}
+	else
+	{
+            *depthFormat = GL_NONE;
+            *stencilFormat = GL_NONE;
+	}
     }
 
     GLES2FBORenderTexture *GLES2FBOManager::createRenderTexture(const String &name, 

@@ -53,7 +53,8 @@ namespace Ogre
 			case GL_DEPTH_COMPONENT24_OES:
             case GL_DEPTH_COMPONENT32_OES:
             case GL_DEPTH24_STENCIL8_OES:  // Packed depth / stencil
-				mBitDepth = 32;
+            case GL_DEPTH_COMPONENT:
+                    mBitDepth = 32;
 				break;
 			}
 		}
