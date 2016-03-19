@@ -146,6 +146,7 @@ elseif(ANDROID)
   file(GLOB PLATFORM_SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/Android/*.cpp"
       src/OgreSearchOps.cpp)
 
+  include_directories("${ANDROID_NDK}/sources/cpufeatures")
   set(PLATFORM_HEADER_INSTALL "Android")
 elseif(FLASHCC)
   set(PLATFORM_HEADERS
