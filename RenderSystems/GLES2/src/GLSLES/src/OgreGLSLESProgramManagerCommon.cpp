@@ -286,6 +286,11 @@ namespace Ogre {
         if(maxLength == 0)
             return;
 
+        // Make sure that the uniform name buffer is at least 255 characters
+        // since buggy drivers may lie about GL_ACTIVE_UNIFORM_MAX_LENGTH.
+        if (maxLength < 255)
+            maxLength = 255;
+
 		uniformName = new char[maxLength + 1];
 		GLUniformReference newGLUniformReference;
 
