@@ -33,6 +33,8 @@ THE SOFTWARE.
 #include "OgreGLES2ManagedResource.h"
 
 namespace Ogre {
+    class GLES2UniformCache;
+
     /** Specialisation of HighLevelGpuProgram to provide support for OpenGL 
         Shader Language (GLSL ES) for OpenGL ES 2.0.
     @remarks
@@ -113,6 +115,8 @@ namespace Ogre {
 		/// compile source into shader object
 		bool compile( const bool checkErrors = false);
 
+		GLES2UniformCache * getUniformCache(void) { return mUniformCache; }
+
 	protected:
 		static CmdPreprocessorDefines msCmdPreprocessorDefines;
 #if !OGRE_NO_GLES2_GLSL_OPTIMISER
@@ -164,6 +168,7 @@ namespace Ogre {
 		/// The optmised source of the program (may be blank until the shader is optmisied)
         String mOptimisedSource;
 #endif
+        GLES2UniformCache *mUniformCache;
     };
 }
 

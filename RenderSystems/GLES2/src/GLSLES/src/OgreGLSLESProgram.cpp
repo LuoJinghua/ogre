@@ -32,6 +32,7 @@ THE SOFTWARE.
 #include "OgreStringConverter.h"
 #include "OgreGLES2Util.h"
 #include "OgreGLES2RenderSystem.h"
+#include "OgreGLES2UniformCache.h"
 
 #include "OgreGLSLESProgram.h"
 #include "OgreGLSLESGpuProgram.h"
@@ -79,6 +80,12 @@ namespace Ogre {
         }
         // Manually assign language now since we use it immediately
         mSyntaxCode = "glsles";
+
+        // Initialise uniform cache
+        if(Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_SEPARATE_SHADER_OBJECTS))
+            mUniformCache = new GLES2UniformCache();
+        else
+            mUniformCache = 0;
     }
     //---------------------------------------------------------------------------
     GLSLESProgram::~GLSLESProgram()
@@ -93,12 +100,17 @@ namespace Ogre {
         {
             unloadHighLevel();
         }
+
+        delete mUniformCache;
+        mUniformCache = 0;
     }
     //---------------------------------------------------------------------------
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
     void GLSLESProgram::notifyOnContextLost()
     {
         unloadHighLevelImpl();
+        if (mUniformCache)
+            mUniformCache->clearCache();
     }
 #endif
     //-----------------------------------------------------------------------
