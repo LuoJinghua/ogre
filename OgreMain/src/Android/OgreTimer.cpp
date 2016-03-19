@@ -27,6 +27,7 @@ THE SOFTWARE.
 */
 #include "OgreTimer.h"
 #include <sys/time.h>
+#include <time.h>
 
 using namespace Ogre;
 
@@ -45,23 +46,50 @@ Timer::~Timer()
 void Timer::reset()
 {
 	zeroClock = clock();
-	gettimeofday(&start, NULL);
+	struct timespec now;
+	if (clock_gettime(CLOCK_MONOTONIC, &now) == 0)
+	{
+		start.tv_sec = now.tv_sec;
+		start.tv_usec = now.tv_nsec / 1000;
+	}
+	else
+	{
+		gettimeofday(&start, NULL);
+	}
 }
 
 //--------------------------------------------------------------------------------//
 unsigned long Timer::getMilliseconds()
 {
 	struct timeval now;
-	gettimeofday(&now, NULL);
-	return (now.tv_sec-start.tv_sec)*1000+(now.tv_usec-start.tv_usec)/1000;
+	struct timespec ts;
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+	{
+		now.tv_sec = ts.tv_sec;
+		now.tv_usec = ts.tv_nsec / 1000;
+	}
+	else
+	{
+		gettimeofday(&now, NULL);
+	}
+	return (now.tv_sec-start.tv_sec)*1000LL+(now.tv_usec-start.tv_usec)/1000;
 }
 
 //--------------------------------------------------------------------------------//
 unsigned long Timer::getMicroseconds()
 {
 	struct timeval now;
-	gettimeofday(&now, NULL);
-	return (now.tv_sec-start.tv_sec)*1000000+(now.tv_usec-start.tv_usec);
+	struct timespec ts;
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+	{
+		now.tv_sec = ts.tv_sec;
+		now.tv_usec = ts.tv_nsec / 1000;
+	}
+	else
+	{
+		gettimeofday(&now, NULL);
+	}
+	return (now.tv_sec-start.tv_sec)*1000000LL+(now.tv_usec-start.tv_usec);
 }
 
 //-- Common Across All Timers ----------------------------------------------------//
