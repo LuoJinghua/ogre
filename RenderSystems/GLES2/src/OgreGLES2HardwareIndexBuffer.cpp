@@ -106,7 +106,7 @@ namespace Ogre {
         static_cast<GLES2HardwareBufferManagerBase*>(mMgr)->getStateCacheManager()->bindGLBuffer(GL_ELEMENT_ARRAY_BUFFER, mBufferId);
 
 #if OGRE_NO_GLES3_SUPPORT == 0 || defined(GL_EXT_map_buffer_range)
-        if (mUsage & HBU_WRITE_ONLY)
+        if (glFlushMappedBufferRangeEXT && mUsage & HBU_WRITE_ONLY)
         {
             OGRE_CHECK_GL_ERROR(glFlushMappedBufferRangeEXT(GL_ELEMENT_ARRAY_BUFFER, mLockStart, mLockSize));
         }
@@ -119,6 +119,7 @@ namespace Ogre {
                 "Buffer data corrupted, please reload", 
                 "GLES2HardwareIndexBuffer::unlock");
         }
+
         mIsLocked = false;
     }
 
@@ -138,35 +139,40 @@ namespace Ogre {
 
         void* pBuffer;
 #if OGRE_NO_GLES3_SUPPORT == 0 || defined(GL_EXT_map_buffer_range)
-        if (mUsage & HBU_WRITE_ONLY)
+        if (glMapBufferRangeEXT)
         {
-            access = GL_MAP_WRITE_BIT_EXT;
-            access |= GL_MAP_FLUSH_EXPLICIT_BIT_EXT;
+            if (mUsage & HBU_WRITE_ONLY)
+            {
+                access = GL_MAP_WRITE_BIT_EXT;
+                access |= GL_MAP_FLUSH_EXPLICIT_BIT_EXT;
+                if(options == HBL_DISCARD || options == HBL_NO_OVERWRITE)
+                {
+                    // Discard the buffer
+                    access |= GL_MAP_INVALIDATE_RANGE_BIT_EXT;
+                }
+            }
+            else if (options == HBL_READ_ONLY)
+                access = GL_MAP_READ_BIT_EXT;
+            else
+                access = GL_MAP_READ_BIT_EXT | GL_MAP_WRITE_BIT_EXT;
+
+            OGRE_CHECK_GL_ERROR(pBuffer = glMapBufferRangeEXT(GL_ELEMENT_ARRAY_BUFFER, offset, length, access));
+        }
+        else
+#endif
+        {
+            // Use glMapBuffer
             if(options == HBL_DISCARD || options == HBL_NO_OVERWRITE)
             {
                 // Discard the buffer
-                access |= GL_MAP_INVALIDATE_RANGE_BIT_EXT;
+                OGRE_CHECK_GL_ERROR(glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)mSizeInBytes, NULL,
+                                                 GLES2HardwareBufferManager::getGLUsage(mUsage)));
             }
-        }
-        else if (options == HBL_READ_ONLY)
-            access = GL_MAP_READ_BIT_EXT;
-        else
-            access = GL_MAP_READ_BIT_EXT | GL_MAP_WRITE_BIT_EXT;
+            if (mUsage & HBU_WRITE_ONLY)
+                access = GL_WRITE_ONLY_OES;
 
-        OGRE_CHECK_GL_ERROR(pBuffer = glMapBufferRangeEXT(GL_ELEMENT_ARRAY_BUFFER, offset, length, access));
-#else
-        // Use glMapBuffer
-        if(options == HBL_DISCARD || options == HBL_NO_OVERWRITE)
-        {
-            // Discard the buffer
-            OGRE_CHECK_GL_ERROR(glBufferData(GL_ELEMENT_ARRAY_BUFFER, (GLsizeiptr)mSizeInBytes, NULL,
-                                             GLES2HardwareBufferManager::getGLUsage(mUsage)));
+            OGRE_CHECK_GL_ERROR(pBuffer = glMapBufferOES(GL_ELEMENT_ARRAY_BUFFER, access));
         }
-        if (mUsage & HBU_WRITE_ONLY)
-            access = GL_WRITE_ONLY_OES;
-
-        OGRE_CHECK_GL_ERROR(pBuffer = glMapBufferOES(GL_ELEMENT_ARRAY_BUFFER, access));
-#endif
         if(pBuffer == 0)
         {
             OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR, 
