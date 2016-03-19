@@ -62,6 +62,9 @@ namespace Ogre
             }
 #endif
 
+			if (infologLength == 0)
+				infologLength = 4096;
+
 			if (infologLength > 1)
 			{
 				GLint charsWritten  = 0;
