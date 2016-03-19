@@ -271,6 +271,29 @@ namespace Ogre {
                 rsc->setCapability(RSC_TEXTURE_COMPRESSION_ATC);
         }
 
+        GLint texFormatCount = 0;
+        glGetIntegerv(GL_NUM_COMPRESSED_TEXTURE_FORMATS, &texFormatCount);
+        if (texFormatCount > 0)
+        {
+            std::vector<GLint> texFormats;
+            texFormats.resize(texFormatCount);
+            glGetIntegerv(GL_COMPRESSED_TEXTURE_FORMATS, &texFormats[0]);
+
+            std::set<GLint> texFormatSet;
+            for (GLint i = 0; i < texFormatCount; i++)
+                texFormatSet.insert(texFormats[i]);
+
+            if (texFormatSet.find(0x83F0) != texFormatSet.end() &&
+                texFormatSet.find(0x83F2) != texFormatSet.end() &&
+                texFormatSet.find(0x83F3) != texFormatSet.end())
+                rsc->setCapability(RSC_TEXTURE_COMPRESSION_DXT);
+
+            if (texFormatSet.find(0x9274) != texFormatSet.end() &&
+                texFormatSet.find(0x9276) != texFormatSet.end() &&
+                texFormatSet.find(0x9278) != texFormatSet.end())
+                rsc->setCapability(RSC_TEXTURE_COMPRESSION_ETC2);
+        }
+
         if (mGLSupport->checkExtension("GL_EXT_texture_filter_anisotropic"))
             rsc->setCapability(RSC_ANISOTROPY);
 
