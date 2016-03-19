@@ -31,6 +31,27 @@ THE SOFTWARE.
 #include "OgreRenderSystem.h"
 #include "OgreBitwise.h"
 
+#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
+#ifndef GL_EXT_texture_compression_dxt1
+#define GL_EXT_texture_compression_dxt1 1
+#define GL_COMPRESSED_RGB_S3TC_DXT1_EXT                   0x83F0
+#endif
+
+#ifndef GL_EXT_texture_compression_s3tc
+#define GL_EXT_texture_compression_s3tc 1
+#define GL_COMPRESSED_RGBA_S3TC_DXT1_EXT                  0x83F1
+#define GL_COMPRESSED_RGBA_S3TC_DXT3_EXT                  0x83F2
+#define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT                  0x83F3
+#endif
+
+#ifndef GL_COMPRESSED_RGB8_ETC2
+#define GL_COMPRESSED_RGB8_ETC2                           0x9274
+#define GL_COMPRESSED_RGBA8_ETC2_EAC                      0x9278
+#define GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2       0x9276
+#endif
+
+#endif
+
 namespace Ogre {
 	//-----------------------------------------------------------------------------
     GLenum GLES2PixelUtil::getGLOriginFormat(PixelFormat mFormat)
@@ -111,7 +132,7 @@ namespace Ogre {
 #	endif
 #endif
 
-#if OGRE_NO_GLES3_SUPPORT == 0
+#ifdef GL_COMPRESSED_RGB8_ETC2
             case PF_ETC2_RGB8:
                 return GL_COMPRESSED_RGB8_ETC2;
             case PF_ETC2_RGBA8:
@@ -370,7 +391,7 @@ namespace Ogre {
 #	endif
 #endif
 
-#if OGRE_NO_GLES3_SUPPORT == 0
+#ifdef GL_COMPRESSED_RGB8_ETC2
             case PF_ETC2_RGB8:
                 return GL_COMPRESSED_RGB8_ETC2;
             case PF_ETC2_RGBA8:
@@ -521,16 +542,19 @@ namespace Ogre {
 #if GL_EXT_texture_compression_dxt1
 				if (!hwGamma)
 					return GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
+				return GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
 #endif
             case PF_DXT3:
 #if GL_EXT_texture_compression_s3tc
 				if (!hwGamma)
 	                return GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+                return GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
 #endif
             case PF_DXT5:
 #if GL_EXT_texture_compression_s3tc
 				if (!hwGamma)
-	                return GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+	                return GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+                return GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
 #endif
                 
 #if (GL_EXT_texture_rg && OGRE_PLATFORM != OGRE_PLATFORM_NACL) || (OGRE_NO_GLES3_SUPPORT == 0)
@@ -629,7 +653,7 @@ namespace Ogre {
 #	endif
 #endif
 
-#if OGRE_NO_GLES3_SUPPORT == 0
+#ifdef GL_COMPRESSED_RGB8_ETC2
             case GL_COMPRESSED_RGB8_ETC2:
                 return PF_ETC2_RGB8;
             case GL_COMPRESSED_RGBA8_ETC2_EAC:
