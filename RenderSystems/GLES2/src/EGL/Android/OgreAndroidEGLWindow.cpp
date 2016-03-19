@@ -49,7 +49,7 @@ namespace Ogre {
 		: EGLWindow(glsupport),
 		  mMaxBufferSize(32),
 		  mMinBufferSize(16),
-		  mMaxDepthSize(16),
+		  mMaxDepthSize(24),
 		  mMaxStencilSize(0),
 		  mMSAA(0),
 		  mCSAA(0)
@@ -236,111 +236,142 @@ namespace Ogre {
 
     void AndroidEGLWindow::_destroyInternalResources()
     {
-        mContext->setCurrent();
-        
-        GLES2RenderSystem::getResourceManager()->notifyOnContextLost();
-        mContext->_destroyInternalResources();
-        
+        LogManager::getSingleton().logMessage("AndroidEGLWindow::_destroyInternalResources!");
+
+
+        // Don't destroy the context
+        mContext->endCurrent();
+        mContext->setDrawable(EGL_NO_SURFACE);
+
         eglDestroySurface(mEglDisplay, mEglSurface);
         EGL_CHECK_ERROR
-        
-        eglTerminate(mEglDisplay);
-        EGL_CHECK_ERROR
-        
-        mEglDisplay = 0;
+
         mEglSurface = 0;
-        
+
         mActive = false;
-		mVisible = false;
+        mVisible = false;
         mClosed = true;
     }
     
     void AndroidEGLWindow::_createInternalResources(NativeWindowType window, AConfiguration* config)
     {
         mWindow = window;
-        
-        int minAttribs[] = {
-            EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-            EGL_BUFFER_SIZE, mMinBufferSize,
-            EGL_DEPTH_SIZE, 16,
-            EGL_NONE
-        };
-        
-        int maxAttribs[] = {
-			EGL_BUFFER_SIZE, mMaxBufferSize,
-            EGL_DEPTH_SIZE, mMaxDepthSize,
-            EGL_STENCIL_SIZE, mMaxStencilSize,
-            EGL_NONE
-        };
 
+        const int minDepthSizes[] = {24, 16};
 		bool bAASuccess = false;
-		if (mCSAA)
-		{
-			try
-			{
-				int CSAAminAttribs[] = {
-					EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-					EGL_BUFFER_SIZE, mMinBufferSize,
-					EGL_DEPTH_SIZE, 16,
-					EGL_COVERAGE_BUFFERS_NV, 1,
-					EGL_COVERAGE_SAMPLES_NV, mCSAA,
-					EGL_NONE
-				};
-				int CSAAmaxAttribs[] = {
-					EGL_BUFFER_SIZE, mMaxBufferSize,
-					EGL_DEPTH_SIZE, mMaxDepthSize,
-					EGL_STENCIL_SIZE, mMaxStencilSize,
-					EGL_COVERAGE_BUFFERS_NV, 1,
-					EGL_COVERAGE_SAMPLES_NV, mCSAA,
-					EGL_NONE
-				};
-				mEglConfig = mGLSupport->selectGLConfig(CSAAminAttribs, CSAAmaxAttribs);
-				bAASuccess = true;
-			}
-			catch (Exception& e)
-			{
-				LogManager::getSingleton().logMessage("AndroidEGLWindow::_createInternalResources: setting CSAA failed");
-			}
-		}
+        for (int i = 0; i < 2 && !bAASuccess; i++)
+        {
+            if (mMaxDepthSize < minDepthSizes[i])
+                break;
 
-		if (mMSAA && !bAASuccess)
-		{
-			try
-			{
-				int MSAAminAttribs[] = {
-					EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-					EGL_BUFFER_SIZE, mMinBufferSize,
-					EGL_DEPTH_SIZE, 16,
-					EGL_SAMPLE_BUFFERS, 1,
-					EGL_SAMPLES, mMSAA,
-					EGL_NONE
-				};
-				int MSAAmaxAttribs[] = {
-					EGL_BUFFER_SIZE, mMaxBufferSize,
-					EGL_DEPTH_SIZE, mMaxDepthSize,
-					EGL_STENCIL_SIZE, mMaxStencilSize,
-					EGL_SAMPLE_BUFFERS, 1,
-					EGL_SAMPLES, mMSAA,
-					EGL_NONE
-				};
-				mEglConfig = mGLSupport->selectGLConfig(MSAAminAttribs, MSAAmaxAttribs);
-				bAASuccess = true;
-			}
-			catch (Exception& e)
-			{
-				LogManager::getSingleton().logMessage("AndroidEGLWindow::_createInternalResources: setting MSAA failed");
-			}
-		}
-        
+            int minAttribs[] = {
+                EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+                EGL_BUFFER_SIZE, mMinBufferSize,
+                EGL_DEPTH_SIZE, minDepthSizes[i],
+                EGL_NONE
+            };
+            
+            int maxAttribs[] = {
+                EGL_BUFFER_SIZE, mMaxBufferSize,
+                EGL_DEPTH_SIZE, mMaxDepthSize,
+                EGL_STENCIL_SIZE, mMaxStencilSize,
+                EGL_NONE
+            };
+
+            //bool bAASuccess = false;
+            if (mCSAA)
+            {
+                try
+                {
+                    int CSAAminAttribs[] = {
+                        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+                        EGL_BUFFER_SIZE, mMinBufferSize,
+                        EGL_DEPTH_SIZE, minDepthSizes[i],
+                        EGL_COVERAGE_BUFFERS_NV, 1,
+                        EGL_COVERAGE_SAMPLES_NV, mCSAA,
+                        EGL_NONE
+                    };
+                    int CSAAmaxAttribs[] = {
+                        EGL_BUFFER_SIZE, mMaxBufferSize,
+                        EGL_DEPTH_SIZE, mMaxDepthSize,
+                        EGL_STENCIL_SIZE, mMaxStencilSize,
+                        EGL_COVERAGE_BUFFERS_NV, 1,
+                        EGL_COVERAGE_SAMPLES_NV, mCSAA,
+                        EGL_NONE
+                    };
+                    mEglConfig = mGLSupport->selectGLConfig(CSAAminAttribs, CSAAmaxAttribs);
+                    bAASuccess = true;
+                }
+                catch (Exception& e)
+                {
+                    LogManager::getSingleton().logMessage("AndroidEGLWindow::_createInternalResources: setting CSAA failed");
+                }
+            }
+
+            if (mMSAA && !bAASuccess)
+            {
+                try
+                {
+                    int MSAAminAttribs[] = {
+                        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+                        EGL_BUFFER_SIZE, mMinBufferSize,
+                        EGL_DEPTH_SIZE, minDepthSizes[i],
+                        EGL_SAMPLE_BUFFERS, 1,
+                        EGL_SAMPLES, mMSAA,
+                        EGL_NONE
+                    };
+                    int MSAAmaxAttribs[] = {
+                        EGL_BUFFER_SIZE, mMaxBufferSize,
+                        EGL_DEPTH_SIZE, mMaxDepthSize,
+                        EGL_STENCIL_SIZE, mMaxStencilSize,
+                        EGL_SAMPLE_BUFFERS, 1,
+                        EGL_SAMPLES, mMSAA,
+                        EGL_NONE
+                    };
+                    mEglConfig = mGLSupport->selectGLConfig(MSAAminAttribs, MSAAmaxAttribs);
+                    bAASuccess = true;
+                }
+                catch (Exception& e)
+                {
+                    LogManager::getSingleton().logMessage("AndroidEGLWindow::_createInternalResources: setting MSAA failed");
+                }
+            }
+        }
+
         mEglDisplay = mGLSupport->getGLDisplay();
-        if (!bAASuccess) mEglConfig = mGLSupport->selectGLConfig(minAttribs, maxAttribs);
-        
+        for (int i = 0; i < 2 && !bAASuccess; i++)
+        {
+            int minAttribs[] = {
+                EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+                EGL_BUFFER_SIZE, mMinBufferSize,
+                EGL_DEPTH_SIZE, minDepthSizes[i],
+                EGL_NONE
+            };
+
+            int maxAttribs[] = {
+                EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+                EGL_BUFFER_SIZE, mMaxBufferSize,
+                EGL_DEPTH_SIZE, mMaxDepthSize,
+                EGL_STENCIL_SIZE, mMaxStencilSize,
+                EGL_NONE
+            };
+
+            try
+			{
+                mEglConfig = mGLSupport->selectGLConfig(minAttribs, maxAttribs);
+                break;
+            }
+            catch (Exception& e)
+			{
+			}
+        }
+
         EGLint format;
         eglGetConfigAttrib(mEglDisplay, mEglConfig, EGL_NATIVE_VISUAL_ID, &format);
         EGL_CHECK_ERROR
         
         ANativeWindow_setBuffersGeometry(mWindow, 0, 0, format);
-        
+
         mEglSurface = createSurfaceFromWindow(mEglDisplay, mWindow);
         
         if(config)
@@ -351,13 +382,39 @@ namespace Ogre {
         
         if(mContext)
         {
+            // Reusing the old contex if it is still available.
+            bool contextLost = true;
+            mContext->setDrawable(mEglSurface);
+            mContext->setCurrent();
+            if (mContext->getDrawable() != EGL_NO_SURFACE &&
+                mContext->getDrawable() == eglGetCurrentSurface(EGL_DRAW) &&
+                mContext->getGLContext() == eglGetCurrentContext() &&
+                mEglConfig == mContext->getGLConfig())
+            {
+                contextLost = false;
+                LogManager::getSingleton().logMessage("AndroidEGLWindow::_createInternalResources: Reusing the old context!");
+            }
+            else
+            {
+                LogManager::getSingleton().logMessage("AndroidEGLWindow::_createInternalResources: The old context has been lost!");
+                mContext->endCurrent();
+                GLES2RenderSystem::getResourceManager()->notifyOnContextLost();
+                mContext->_destroyInternalResources();
+            }
             mActive = true;
             mVisible = true;
             mClosed = false;
-            
-            mContext->_createInternalResources(mEglDisplay, mEglConfig, mEglSurface, NULL);
 
-            static_cast<GLES2RenderSystem*>(Ogre::Root::getSingletonPtr()->getRenderSystem())->resetRenderer(this);
+            if (contextLost)
+                mContext->_createInternalResources(mEglDisplay, mEglConfig, mEglSurface, NULL);
+            mContext->setCurrent();
+
+            windowMovedOrResized();
+            if (contextLost)
+            {
+                static_cast<GLES2RenderSystem*>(Ogre::Root::getSingletonPtr()->getRenderSystem())->resetRenderer(this);
+                GLES2RenderSystem::getResourceManager()->notifyOnContextReset();
+            }
         }
     }
 }

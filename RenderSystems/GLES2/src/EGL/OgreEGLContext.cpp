@@ -118,4 +118,24 @@ namespace Ogre {
 	{
 		return mDrawable;
 	}
+
+	void EGLContext::setDrawable(EGLSurface drawable)
+	{
+		mDrawable = drawable;
+	}
+
+	::EGLConfig EGLContext::getGLConfig() const
+	{
+		return mConfig;
+	}
+
+	void EGLContext::setGLConfig(EGLConfig config)
+	{
+		mConfig = config;
+	}
+
+	::EGLContext EGLContext::getGLContext() const
+	{
+		return mContext;
+	}
 }

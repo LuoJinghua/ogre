@@ -179,6 +179,9 @@ namespace Ogre {
 
     EGLDisplay EGLSupport::getGLDisplay(void)
     {
+        if (mGLDisplay != EGL_NO_DISPLAY)
+            return mGLDisplay;
+
         EGLint major = 0, minor = 0;
 
         mGLDisplay = eglGetDisplay(mNativeDisplay);
@@ -521,8 +524,11 @@ namespace Ogre {
 
     void EGLSupport::stop()
     {
+        if (mGLDisplay == EGL_NO_DISPLAY)
+            return;
 		eglTerminate(mGLDisplay);
 		EGL_CHECK_ERROR
+        mGLDisplay = EGL_NO_DISPLAY;
     }
 
     void EGLSupport::setGLDisplay( EGLDisplay val )

@@ -57,8 +57,11 @@ namespace Ogre {
             virtual void endCurrent();
             virtual GLES2Context* clone() const = 0;
 
-	    EGLSurface getDrawable() const;
-
+            EGLSurface getDrawable() const;
+            void setDrawable(EGLSurface drawable);
+            ::EGLConfig getGLConfig() const;
+            void setGLConfig(EGLConfig config);
+            ::EGLContext getGLContext() const;
     };
 }
 
