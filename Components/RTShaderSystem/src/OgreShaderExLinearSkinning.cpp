@@ -74,13 +74,13 @@ bool LinearSkinning::resolveParameters(ProgramSet* programSet)
 
 	//input param
 	mParamInPosition = vsMain->resolveInputParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
-	mParamInNormal = vsMain->resolveInputParameter(Parameter::SPS_NORMAL, 0, Parameter::SPC_NORMAL_OBJECT_SPACE, GCT_FLOAT3);
+	//mParamInNormal = vsMain->resolveInputParameter(Parameter::SPS_NORMAL, 0, Parameter::SPC_NORMAL_OBJECT_SPACE, GCT_FLOAT3);
 	//mParamInBiNormal = vsMain->resolveInputParameter(Parameter::SPS_BINORMAL, 0, Parameter::SPC_BINORMAL_OBJECT_SPACE, GCT_FLOAT3);
 	//mParamInTangent = vsMain->resolveInputParameter(Parameter::SPS_TANGENT, 0, Parameter::SPC_TANGENT_OBJECT_SPACE, GCT_FLOAT3);
 
 	//local param
-	mParamLocalPositionWorld = vsMain->resolveLocalParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_WORLD_SPACE, GCT_FLOAT4);
-	mParamLocalNormalWorld = vsMain->resolveLocalParameter(Parameter::SPS_NORMAL, 0, Parameter::SPC_NORMAL_WORLD_SPACE, GCT_FLOAT3);
+	//mParamLocalPositionWorld = vsMain->resolveLocalParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_WORLD_SPACE, GCT_FLOAT4);
+	//mParamLocalNormalWorld = vsMain->resolveLocalParameter(Parameter::SPS_NORMAL, 0, Parameter::SPC_NORMAL_WORLD_SPACE, GCT_FLOAT3);
 	//mParamLocalTangentWorld = vsMain->resolveLocalParameter(Parameter::SPS_TANGENT, 0, Parameter::SPC_TANGENT_WORLD_SPACE, GCT_FLOAT3);
 	//mParamLocalBinormalWorld = vsMain->resolveLocalParameter(Parameter::SPS_BINORMAL, 0, Parameter::SPC_BINORMAL_WORLD_SPACE, GCT_FLOAT3);
 
@@ -90,11 +90,11 @@ bool LinearSkinning::resolveParameters(ProgramSet* programSet)
 	//check if parameter retrival went well
 	bool isValid =
 		(mParamInPosition.get() != NULL) &&
-		(mParamInNormal.get() != NULL) &&
+		//(mParamInNormal.get() != NULL) &&
 		//(mParamInBiNormal.get() != NULL) &&
 		//(mParamInTangent.get() != NULL) &&
-		(mParamLocalPositionWorld.get() != NULL) &&
-		(mParamLocalNormalWorld.get() != NULL) &&
+		//(mParamLocalPositionWorld.get() != NULL) &&
+		//(mParamLocalNormalWorld.get() != NULL) &&
 		//(mParamLocalTangentWorld.get() != NULL) &&
 		//(mParamLocalBinormalWorld.get() != NULL) &&
 		(mParamOutPositionProj.get() != NULL);
@@ -102,6 +102,10 @@ bool LinearSkinning::resolveParameters(ProgramSet* programSet)
 
 	if (mDoBoneCalculations == true)
 	{
+		//local param
+		mParamLocalPositionWorld = vsMain->resolveLocalParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_WORLD_SPACE, GCT_FLOAT4);
+		mParamLocalNormalWorld = vsMain->resolveLocalParameter(Parameter::SPS_NORMAL, 0, Parameter::SPC_NORMAL_WORLD_SPACE, GCT_FLOAT3);
+
 		if (ShaderGenerator::getSingleton().getTargetLanguage() == "hlsl")
 		{
 			//set hlsl shader to use row-major matrices instead of column-major.
@@ -115,7 +119,10 @@ bool LinearSkinning::resolveParameters(ProgramSet* programSet)
 		//mParamInTangent = vsMain->resolveInputParameter(Parameter::SPS_TANGENT, 0, Parameter::SPC_TANGENT_OBJECT_SPACE, GCT_FLOAT3);
 		mParamInIndices = vsMain->resolveInputParameter(Parameter::SPS_BLEND_INDICES, 0, Parameter::SPC_UNKNOWN, GCT_FLOAT4);
 		mParamInWeights = vsMain->resolveInputParameter(Parameter::SPS_BLEND_WEIGHTS, 0, Parameter::SPC_UNKNOWN, GCT_FLOAT4);
-		mParamInWorldMatrices = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_WORLD_MATRIX_ARRAY_3x4, 0, mBoneCount);
+		if (ShaderGenerator::getSingleton().getTargetLanguage() == "glsles")
+			mParamInWorldMatrices = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_WORLD_MATRIX_ARRAY, 0, mBoneCount);
+		else
+			mParamInWorldMatrices = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_WORLD_MATRIX_ARRAY_3x4, 0, mBoneCount);
 		mParamInInvWorldMatrix = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_INVERSE_WORLD_MATRIX, 0);
 		mParamInViewProjMatrix = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_VIEWPROJ_MATRIX, 0);
 
@@ -167,7 +174,7 @@ bool LinearSkinning::addFunctionInvocations(ProgramSet* programSet)
 	addPositionCalculations(vsMain, internalCounter);
 
 	//add functions to calculate normal and normal related data in world and object space
-	addNormalRelatedCalculations(vsMain, mParamInNormal, mParamLocalNormalWorld, internalCounter);
+	//addNormalRelatedCalculations(vsMain, mParamInNormal, mParamLocalNormalWorld, internalCounter);
 	//addNormalRelatedCalculations(vsMain, mParamInTangent, mParamLocalTangentWorld, internalCounter);
 	//addNormalRelatedCalculations(vsMain, mParamInBiNormal, mParamLocalBinormalWorld, internalCounter);
 	return true;
@@ -186,12 +193,15 @@ void LinearSkinning::addPositionCalculations(Function* vsMain, int& funcCounter)
 			addIndexedPositionWeight(vsMain, i, funcCounter);
 		}
 
-		//update back the original position relative to the object
-		curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM, funcCounter++);
-		curFuncInvocation->pushOperand(mParamInInvWorldMatrix, Operand::OPS_IN);
-		curFuncInvocation->pushOperand(mParamLocalPositionWorld, Operand::OPS_IN);
-		curFuncInvocation->pushOperand(mParamInPosition, Operand::OPS_OUT);
-		vsMain->addAtomInstance(curFuncInvocation);
+		if (ShaderGenerator::getSingleton().getTargetLanguage() != "glsles")
+		{
+			//update back the original position relative to the object
+			curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM, funcCounter++);
+			curFuncInvocation->pushOperand(mParamInInvWorldMatrix, Operand::OPS_IN);
+			curFuncInvocation->pushOperand(mParamLocalPositionWorld, Operand::OPS_IN);
+			curFuncInvocation->pushOperand(mParamInPosition, Operand::OPS_OUT);
+			vsMain->addAtomInstance(curFuncInvocation);
+		}
 
 		//update the projective position thereby filling the transform stage role
 		curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM, funcCounter++);
@@ -202,12 +212,14 @@ void LinearSkinning::addPositionCalculations(Function* vsMain, int& funcCounter)
 	}
 	else
 	{
+#if 0
 		//update from object to world space
 		curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM, funcCounter++);
 		curFuncInvocation->pushOperand(mParamInWorldMatrix, Operand::OPS_IN);
 		curFuncInvocation->pushOperand(mParamInPosition, Operand::OPS_IN);
 		curFuncInvocation->pushOperand(mParamLocalPositionWorld, Operand::OPS_OUT);
 		vsMain->addAtomInstance(curFuncInvocation);
+#endif
 
 		//update from object to projective space
 		curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM, funcCounter++);
@@ -234,12 +246,15 @@ void LinearSkinning::addNormalRelatedCalculations(Function* vsMain,
 			addIndexedNormalRelatedWeight(vsMain, pNormalRelatedParam, pNormalWorldRelatedParam, i, funcCounter);
 		}
 
-		//update back the original position relative to the object
-		curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM, funcCounter++);
-		curFuncInvocation->pushOperand(mParamInInvWorldMatrix, Operand::OPS_IN);
-		curFuncInvocation->pushOperand(pNormalWorldRelatedParam, Operand::OPS_IN);
-		curFuncInvocation->pushOperand(pNormalRelatedParam, Operand::OPS_OUT);
-		vsMain->addAtomInstance(curFuncInvocation);
+		if (ShaderGenerator::getSingleton().getTargetLanguage() != "glsles")
+		{
+			//update back the original position relative to the object
+			curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_TRANSFORM, FFP_VS_TRANSFORM, funcCounter++);
+			curFuncInvocation->pushOperand(mParamInInvWorldMatrix, Operand::OPS_IN);
+			curFuncInvocation->pushOperand(pNormalWorldRelatedParam, Operand::OPS_IN);
+			curFuncInvocation->pushOperand(pNormalRelatedParam, Operand::OPS_OUT);
+			vsMain->addAtomInstance(curFuncInvocation);
+		}
 	}
 	else
 	{
@@ -266,7 +281,10 @@ void LinearSkinning::addIndexedPositionWeight(Function* vsMain,
 	curFuncInvocation->pushOperand(mParamInWorldMatrices, Operand::OPS_IN);
 	curFuncInvocation->pushOperand(mParamInIndices, Operand::OPS_IN,  indexMask, 1);
 	curFuncInvocation->pushOperand(mParamInPosition, Operand::OPS_IN);
-	curFuncInvocation->pushOperand(mParamTempFloat4, Operand::OPS_OUT, Operand::OPM_XYZ);
+	if (ShaderGenerator::getSingleton().getTargetLanguage() == "glsles")
+		curFuncInvocation->pushOperand(mParamTempFloat4, Operand::OPS_OUT);
+	else
+		curFuncInvocation->pushOperand(mParamTempFloat4, Operand::OPS_OUT, Operand::OPM_XYZ);
 	vsMain->addAtomInstance(curFuncInvocation);
 
 	//set w value of temporary param to 1

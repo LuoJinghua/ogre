@@ -257,6 +257,8 @@ namespace Ogre {
             mContentToPerVertexAttributes[Parameter::SPC_TEXTURE_COORDINATE7] = "uv7";
             mContentToPerVertexAttributes[Parameter::SPC_COLOR_DIFFUSE] = "colour";
             mContentToPerVertexAttributes[Parameter::SPC_COLOR_SPECULAR] = "secondary_colour";
+            mContentToPerVertexAttributes[Parameter::SPC_BLEND_WEIGHTS] = "blendWeights";
+            mContentToPerVertexAttributes[Parameter::SPC_BLEND_INDICES] = "blendIndices";
         }
 
         //-----------------------------------------------------------------------

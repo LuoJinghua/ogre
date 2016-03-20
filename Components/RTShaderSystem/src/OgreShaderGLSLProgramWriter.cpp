@@ -100,6 +100,8 @@ void GLSLProgramWriter::initializeStringMaps()
 	mContentToPerVertexAttributes[Parameter::SPC_TEXTURE_COORDINATE5] = "uv5";
 	mContentToPerVertexAttributes[Parameter::SPC_TEXTURE_COORDINATE6] = "uv6";
 	mContentToPerVertexAttributes[Parameter::SPC_TEXTURE_COORDINATE7] = "uv7";	
+	mContentToPerVertexAttributes[Parameter::SPC_BLEND_WEIGHTS] = "blendWeights";
+	mContentToPerVertexAttributes[Parameter::SPC_BLEND_INDICES] = "blendIndices";
 
 	if (mGLSLVersion >= 130)
 	{
