@@ -206,6 +206,11 @@ endif()
 
 target_link_libraries(SampleBrowser ${OGRE_LIBRARIES} ${OGRE_PLUGIN_LIBRARIES} ${OIS_LIBRARIES} ${SAMPLE_LIBRARIES})
 
+# Add jemalloc
+if (OGRE_STATIC AND OGRE_CONFIG_ALLOCATOR STREQUAL "5")
+	target_link_libraries(SampleBrowser ${JEMALLOC_LIBRARIES})
+endif()
+
 # Add samples as dependencies
 add_dependencies(SampleBrowser ${OGRE_SAMPLES_LIST})
 

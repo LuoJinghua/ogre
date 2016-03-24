@@ -395,7 +395,8 @@ set(OGRE_CONFIG_ALLOCATOR 4 CACHE STRING
   1 - Standard allocator
   2 - nedmalloc
   3 - User-provided allocator
-  4 - nedmalloc with pooling"
+  4 - nedmalloc with pooling
+  5 - jemalloc allator"
 )
 endif ()
 

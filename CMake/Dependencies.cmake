@@ -91,6 +91,8 @@ if (UNIX AND NOT APPLE AND NOT ANDROID AND NOT FLASHCC)
   mark_as_advanced(XAW_LIBRARY)
 endif ()
 
+# Find jemalloc
+find_package(JeMalloc)
 
 #######################################################################
 # RenderSystem dependencies
