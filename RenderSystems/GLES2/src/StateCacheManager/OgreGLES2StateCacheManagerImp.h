@@ -57,7 +57,7 @@ namespace Ogre
             TexParameterfMap mTexParameterfMap;
         };
 
-        typedef HashMap<GLuint, TextureUnitParams> TexUnitsMap;
+        typedef map<GLuint, TextureUnitParams>::type TexUnitsMap;
 
         /* These variables are used for caching OpenGL state.
          They are cached because state changes can be quite expensive,
@@ -68,6 +68,7 @@ namespace Ogre
         BindBufferMap mActiveBufferMap;
         /// A map of texture parameters for each texture unit
         TexUnitsMap mTexUnitsMap;
+        map<GLuint, GLuint>::type mActiveTexture;
         /// Array of each OpenGL feature that is enabled i.e. blending, depth test, etc.
         vector<GLenum>::type mEnableVector;
         /// Stores the current clear colour
@@ -75,7 +76,7 @@ namespace Ogre
         /// Stores the current colour write mask
         vector<GLboolean>::type mColourMask;
         /// Stores the currently enabled vertex attributes
-        vector<GLuint>::type mEnabledVertexAttribs;
+        set<GLuint>::type mEnabledVertexAttribs;
         /// Stores the current depth write mask
         GLboolean mDepthMask;
         /// Stores the current polygon rendering mode

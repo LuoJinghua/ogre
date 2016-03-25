@@ -101,8 +101,9 @@ namespace Ogre {
         mActiveBufferMap.clear();
         mTexUnitsMap.clear();
 
-        mEnabledVertexAttribs.reserve(64);
         mEnabledVertexAttribs.clear();
+
+        mActiveTexture.clear();
     }
     
     GLES2StateCacheManagerImp::~GLES2StateCacheManagerImp(void)
@@ -163,7 +164,6 @@ namespace Ogre {
             // An update will be forced next time we try to bind on this target.
             (*i).second = 0;
         }
-
         if(target == GL_FRAMEBUFFER)
         {
             OGRE_CHECK_GL_ERROR(glDeleteFramebuffers(1, &buffer));
@@ -186,15 +186,17 @@ namespace Ogre {
     // TODO: Store as high/low bits of a GLuint, use vector instead of map for TexParameteriMap
     void GLES2StateCacheManagerImp::setTexParameteri(GLenum target, GLenum pname, GLint param)
     {
+        GLuint lastBoundTexID = mActiveTexture[mActiveTextureUnit];
+
         // Check if we have a map entry for this texture id. If not, create a blank one and insert it.
-        TexUnitsMap::iterator it = mTexUnitsMap.find(mLastBoundTexID);
+        TexUnitsMap::iterator it = mTexUnitsMap.find(lastBoundTexID);
         if (it == mTexUnitsMap.end())
         {
             TextureUnitParams unit;
-            mTexUnitsMap[mLastBoundTexID] = unit;
+            mTexUnitsMap[lastBoundTexID] = unit;
             
             // Update the iterator
-            it = mTexUnitsMap.find(mLastBoundTexID);
+            it = mTexUnitsMap.find(lastBoundTexID);
         }
         
         // Get a local copy of the parameter map and search for this parameter
@@ -224,15 +226,17 @@ namespace Ogre {
 
     void GLES2StateCacheManagerImp::setTexParameterf(GLenum target, GLenum pname, GLfloat param)
     {
-        // Check if we have a map entry for this texture id. If not, create a blank one and insert it.
-        TexUnitsMap::iterator it = mTexUnitsMap.find(mLastBoundTexID);
+        GLuint lastBoundTexID = mActiveTexture[mActiveTextureUnit];
+
+       // Check if we have a map entry for this texture id. If not, create a blank one and insert it.
+        TexUnitsMap::iterator it = mTexUnitsMap.find(lastBoundTexID);
         if (it == mTexUnitsMap.end())
         {
             TextureUnitParams unit;
-            mTexUnitsMap[mLastBoundTexID] = unit;
+            mTexUnitsMap[lastBoundTexID] = unit;
 
             // Update the iterator
-            it = mTexUnitsMap.find(mLastBoundTexID);
+            it = mTexUnitsMap.find(lastBoundTexID);
         }
 
         // Get a local copy of the parameter map and search for this parameter
@@ -262,8 +266,10 @@ namespace Ogre {
 
     void GLES2StateCacheManagerImp::getTexParameterfv(GLenum target, GLenum pname, GLfloat *params)
     {
-        // Check if we have a map entry for this texture id.
-        TexUnitsMap::iterator it = mTexUnitsMap.find(mLastBoundTexID);
+        GLuint lastBoundTexID = mActiveTexture[mActiveTextureUnit];
+
+       // Check if we have a map entry for this texture id.
+        TexUnitsMap::iterator it = mTexUnitsMap.find(lastBoundTexID);
 
         // Get a local copy of the parameter map and search for this parameter
         TexParameterfMap::iterator i = (*it).second.mTexParameterfMap.find(pname);
@@ -274,7 +280,8 @@ namespace Ogre {
     void GLES2StateCacheManagerImp::bindGLTexture(GLenum target, GLuint texture)
     {
         mLastBoundTexID = texture;
-        
+        mActiveTexture[mActiveTextureUnit] = texture;
+
         // Update GL
         OGRE_CHECK_GL_ERROR(glBindTexture(target, texture));
     }
@@ -423,10 +430,10 @@ namespace Ogre {
 
     void GLES2StateCacheManagerImp::setVertexAttribEnabled(GLuint attrib)
     {
-        bool found = std::find(mEnabledVertexAttribs.begin(), mEnabledVertexAttribs.end(), attrib) != mEnabledVertexAttribs.end();
+        bool found = mEnabledVertexAttribs.find(attrib) != mEnabledVertexAttribs.end();
         if(!found)
         {
-            mEnabledVertexAttribs.push_back(attrib);
+            mEnabledVertexAttribs.insert(attrib);
 
             OGRE_CHECK_GL_ERROR(glEnableVertexAttribArray(attrib));
         }
@@ -434,7 +441,7 @@ namespace Ogre {
 
     void GLES2StateCacheManagerImp::setVertexAttribDisabled(GLuint attrib)
     {
-        vector<GLuint>::iterator iter = std::find(mEnabledVertexAttribs.begin(), mEnabledVertexAttribs.end(), attrib);
+        set<GLuint>::iterator iter = mEnabledVertexAttribs.find(attrib);
         if(iter != mEnabledVertexAttribs.end())
         {
             mEnabledVertexAttribs.erase(iter);
