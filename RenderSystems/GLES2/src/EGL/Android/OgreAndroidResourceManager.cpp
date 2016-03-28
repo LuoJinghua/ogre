@@ -41,7 +41,8 @@ namespace Ogre
 	}
     //-----------------------------------------------------------------------
 	void AndroidResourceManager::notifyOnContextLost()
-	{				
+	{
+		OGRE_LOCK_MUTEX(mMutex);
 		ResourceContainerIterator it = mResources.begin();
 		while (it != mResources.end())
 		{
@@ -52,6 +53,7 @@ namespace Ogre
     //-----------------------------------------------------------------------
 	void AndroidResourceManager::notifyOnContextReset()
 	{
+		OGRE_LOCK_MUTEX(mMutex);
 		ResourceContainerIterator it = mResources.begin();
 		while (it != mResources.end())
 		{
@@ -61,14 +63,14 @@ namespace Ogre
 	}
 	//-----------------------------------------------------------------------
 	void AndroidResourceManager::_notifyResourceCreated(AndroidResource* pResource)
-	{			
-		mResources.push_back(pResource);
+	{
+		OGRE_LOCK_MUTEX(mMutex);
+		mResources.insert(pResource);
 	}
 	//-----------------------------------------------------------------------
 	void AndroidResourceManager::_notifyResourceDestroyed(AndroidResource* pResource)
-	{		
-        ResourceContainerIterator it = std::find( mResources.begin(), mResources.end(), pResource );
-        if(it != mResources.end())
-            mResources.erase(it);
+	{
+        OGRE_LOCK_MUTEX(mMutex);
+        mResources.erase(pResource);
 	}
 }

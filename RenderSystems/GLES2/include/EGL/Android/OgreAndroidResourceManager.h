@@ -54,7 +54,7 @@ namespace Ogre {
 	
 	// Types.
 	protected:
-		typedef vector<AndroidResource*>::type	ResourceContainer;
+		typedef set<AndroidResource*>::type	ResourceContainer;
 		typedef ResourceContainer::iterator		ResourceContainerIterator;
 
 	// Protected methods.
@@ -69,6 +69,7 @@ namespace Ogre {
 	// Attributes.
 	protected:		
 		ResourceContainer			mResources;
+		OGRE_MUTEX(mMutex);
 	};
 }
 
