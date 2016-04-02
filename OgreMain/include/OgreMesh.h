@@ -57,6 +57,7 @@ namespace Ogre {
     struct MeshLodUsage;
     struct LodConfig;
     class LodStrategy;
+    class MeshSerializeInfo;
 
     /** Resource holding data about 3D mesh.
     @remarks
@@ -187,6 +188,8 @@ namespace Ogre {
         PoseList mPoseList;
         mutable bool mPosesIncludeNormals;
 
+        /// Info for unserialization from disk
+        MeshSerializeInfo* mSerializeInfo;
 
         /** Loads the mesh from disk.  This call only performs IO, it
             does not parse the bytestream or check for any errors therein.

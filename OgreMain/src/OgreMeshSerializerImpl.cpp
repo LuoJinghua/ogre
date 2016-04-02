@@ -103,7 +103,7 @@ namespace Ogre {
         LogManager::getSingleton().logMessage("MeshSerializer export successful.");
     }
     //---------------------------------------------------------------------
-    void MeshSerializerImpl::importMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializerListener *listener)
+    void MeshSerializerImpl::importMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info, MeshSerializerListener *listener)
     {
 		// Determine endianness (must be the first thing we do!)
 		determineEndianness(stream);
@@ -118,13 +118,297 @@ namespace Ogre {
             switch (streamID)
             {
             case M_MESH:
-                readMesh(stream, pMesh, listener);
+                readMesh(stream, pMesh, info, listener);
                 break;
 			}
 
             streamID = readChunk(stream);
         }
     }
+    //---------------------------------------------------------------------
+    void MeshSerializerImpl::importMeshVertexData(DataStreamPtr& stream, Mesh* pDest, MeshSerializeInfo* info)
+    {
+        mFlipEndian = info->flipEndian;
+        if (info->sharedVertexDataInfo)
+        {
+			pDest->sharedVertexData = OGRE_NEW VertexData();
+            readGeometryData(stream, pDest, pDest->sharedVertexData, info->sharedVertexDataInfo);
+        }
+		
+        for (uint i = 0; i < pDest->getNumSubMeshes(); i++)
+        {
+            SubMesh* sm = pDest->getSubMesh(i);
+            SubMeshInfo& smInfo = info->submeshes[i];
+            readSubMeshData(stream, pDest, sm, smInfo);
+        }
+        readLodData(stream, pDest, info);
+        readEdgeListData(stream, pDest, info);
+        readAnimationsData(stream, pDest, info);
+    }
+    //---------------------------------------------------------------------
+    void MeshSerializerImpl::readSubMeshData(DataStreamPtr& stream, Mesh* pMesh, SubMesh* sm,
+                                             SubMeshInfo& smInfo)
+    {
+        HardwareIndexBufferSharedPtr ibuf;
+        bool idx32bit = smInfo.idx32bit;
+        size_t indexCount = sm->indexData->indexCount;
+        if (indexCount > 0)
+        {
+            stream->seek(smInfo.offset);
+            if (idx32bit)
+            {
+                ibuf = HardwareBufferManager::getSingleton().
+                    createIndexBuffer(
+                        HardwareIndexBuffer::IT_32BIT,
+                        sm->indexData->indexCount,
+                        pMesh->mIndexBufferUsage,
+                        pMesh->mIndexBufferShadowBuffer);
+                // unsigned int* faceVertexIndices
+                unsigned int* pIdx = static_cast<unsigned int*>(
+                    ibuf->lock(HardwareBuffer::HBL_DISCARD)
+                    );
+                readInts(stream, pIdx, sm->indexData->indexCount);
+                ibuf->unlock();
+            }
+            else // 16-bit
+            {
+                ibuf = HardwareBufferManager::getSingleton().
+                    createIndexBuffer(
+                        HardwareIndexBuffer::IT_16BIT,
+                        sm->indexData->indexCount,
+                        pMesh->mIndexBufferUsage,
+                        pMesh->mIndexBufferShadowBuffer);
+                // unsigned short* faceVertexIndices
+                unsigned short* pIdx = static_cast<unsigned short*>(
+                    ibuf->lock(HardwareBuffer::HBL_DISCARD)
+                    );
+                readShorts(stream, pIdx, sm->indexData->indexCount);
+                ibuf->unlock();
+            }
+        }
+        sm->indexData->indexBuffer = ibuf;
+
+        // M_GEOMETRY stream (Optional: present only if useSharedVertices = false)
+        if (!sm->useSharedVertices)
+        {
+            sm->vertexData = OGRE_NEW VertexData();
+            readGeometryData(stream, pMesh, sm->vertexData, smInfo.vertexDataInfo);
+        }
+    }
+    //---------------------------------------------------------------------
+    void MeshSerializerImpl::readGeometryData(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* sourceInfo)
+    {
+        dest->vertexStart = sourceInfo->vertexStart;
+        dest->vertexCount = sourceInfo->vertexCount;
+
+        VertexDeclaration* vertexDeclaration = &sourceInfo->vertexDeclaration;
+        const VertexDeclaration::VertexElementList& elements = vertexDeclaration->getElements();
+        for (VertexDeclaration::VertexElementList::const_iterator it = elements.begin();
+             it != elements.end(); ++it)
+        {
+            const VertexElement& element = *it;
+            dest->vertexDeclaration->addElement(element.getSource(), element.getOffset(), element.getType(), element.getSemantic(), element.getIndex());
+        }
+
+        for (MeshVertexDataInfo::BufferInfoMap::iterator it = sourceInfo->vertexBufferInfo.begin();
+             it != sourceInfo->vertexBufferInfo.end(); ++it)
+            readGeometryVertexBufferData(stream, pMesh, dest, sourceInfo, it->first, it->second);
+
+        // Perform any necessary colour conversion for an active rendersystem
+        if (dest && Root::getSingletonPtr() && Root::getSingleton().getRenderSystem())
+        {
+            // We don't know the source type if it's VET_COLOUR, but assume ARGB
+            // since that's the most common. Won't get used unless the mesh is
+            // ambiguous anyway, which will have been warned about in the log
+            dest->convertPackedColour(VET_COLOUR_ARGB,
+                                      VertexElement::getBestColourVertexElementType());
+        }
+    }
+    //---------------------------------------------------------------------
+    void MeshSerializerImpl::readGeometryVertexBufferData(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo, uint bindIndex, const MeshVertexDataInfo::BufferInfo& bufferInfo)
+    {
+        size_t vertexSize = dest->vertexDeclaration->getVertexSize(bindIndex);
+
+        // Create / populate vertex buffer
+        HardwareVertexBufferSharedPtr vbuf;
+        vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
+            vertexSize,
+            dest->vertexCount,
+            pMesh->mVertexBufferUsage,
+            pMesh->mVertexBufferShadowBuffer);
+        void* pBuf = vbuf->lock(HardwareBuffer::HBL_DISCARD);
+        stream->seek(bufferInfo.offset);
+        stream->read(pBuf, dest->vertexCount * vertexSize);
+
+        // endian conversion for OSX
+        flipFromLittleEndian(
+             pBuf,
+             dest->vertexCount,
+             vertexSize,
+             dest->vertexDeclaration->findElementsBySource(bindIndex));
+
+        // Adjust individual v values to (1 - v)
+        if (bufferInfo.flipY)
+        {
+            float* pFloat = (float*)pBuf;
+            for (size_t i = 0; i < dest->vertexCount; ++i)
+            {
+                ++pFloat; // skip u
+                *pFloat = 1.0f - *pFloat; // v = 1 - v
+                ++pFloat;
+            }
+        }
+
+        vbuf->unlock();
+
+        // Set binding
+        dest->vertexBufferBinding->setBinding(bindIndex, vbuf);
+    }
+    //---------------------------------------------------------------------
+    void MeshSerializerImpl::readLodData(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info)
+    {
+        for (MeshSerializeInfo::LodInfoMap::iterator i = info->lodInfo.begin();
+             i != info->lodInfo.end(); ++i)
+        {
+            MeshLodInfo& lodInfo = i->second;
+            for (MeshLodInfo::BufferInfoMap::iterator it = lodInfo.bufferInfoMap.begin();
+                 it != lodInfo.bufferInfoMap.end(); ++it)
+            {
+                uint lodNum = it->first;
+                SubMesh* sm = pMesh->getSubMesh(i->first);
+                // lodNum - 1 because SubMesh doesn't store full detail LOD
+                IndexData* indexData = sm->mLodFaceList[lodNum - 1];
+                // bool indexes32Bit
+                bool idx32Bit = it->second.idx32bit;
+                stream->seek(it->second.offset);
+                // unsigned short*/int* faceIndexes;  ((v1, v2, v3) * numFaces)
+                if (idx32Bit)
+                {
+                    indexData->indexBuffer = HardwareBufferManager::getSingleton().
+                        createIndexBuffer(HardwareIndexBuffer::IT_32BIT, indexData->indexCount,
+                            pMesh->mIndexBufferUsage, pMesh->mIndexBufferShadowBuffer);
+                    unsigned int* pIdx = static_cast<unsigned int*>(
+                        indexData->indexBuffer->lock(
+                        0,
+                        indexData->indexBuffer->getSizeInBytes(),
+                        HardwareBuffer::HBL_DISCARD) );
+
+                    readInts(stream, pIdx, indexData->indexCount);
+                    indexData->indexBuffer->unlock();
+                    
+                }
+                else
+                {
+                    indexData->indexBuffer = HardwareBufferManager::getSingleton().
+                        createIndexBuffer(HardwareIndexBuffer::IT_16BIT, indexData->indexCount,
+                            pMesh->mIndexBufferUsage, pMesh->mIndexBufferShadowBuffer);
+                    unsigned short* pIdx = static_cast<unsigned short*>(
+                        indexData->indexBuffer->lock(
+                            0,
+                            indexData->indexBuffer->getSizeInBytes(),
+                            HardwareBuffer::HBL_DISCARD));
+                    readShorts(stream, pIdx, indexData->indexCount);
+                    indexData->indexBuffer->unlock();
+                }
+            }
+        }
+	}
+	//---------------------------------------------------------------------
+	void MeshSerializerImpl::readEdgeListData(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info)
+	{
+		for (MeshSerializeInfo::EdgeLoadIndexList::iterator it = info->edgeLodIndices.begin();
+			 it != info->edgeLodIndices.end(); ++it)
+		{
+			MeshLodUsage& usage = const_cast<MeshLodUsage&>(pMesh->getLodLevel(*it));
+
+			// Postprocessing edge groups
+			EdgeData::EdgeGroupList::iterator egi, egend;
+			egend = usage.edgeData->edgeGroups.end();
+			for (egi = usage.edgeData->edgeGroups.begin(); egi != egend; ++egi)
+			{
+				EdgeData::EdgeGroup& edgeGroup = *egi;
+				// Populate edgeGroup.vertexData pointers
+				// If there is shared vertex data, vertexSet 0 is that,
+				// otherwise 0 is first dedicated
+				if (pMesh->sharedVertexData)
+				{
+					if (edgeGroup.vertexSet == 0)
+					{
+						edgeGroup.vertexData = pMesh->sharedVertexData;
+					}
+					else
+					{
+						edgeGroup.vertexData = pMesh->getSubMesh(
+							(unsigned short)edgeGroup.vertexSet-1)->vertexData;
+					}
+				}
+				else
+				{
+					edgeGroup.vertexData = pMesh->getSubMesh(
+						(unsigned short)edgeGroup.vertexSet)->vertexData;
+				}
+			}
+		}
+	}
+
+	//---------------------------------------------------------------------
+	void MeshSerializerImpl::readAnimationsData(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info)
+	{
+		for (size_t i = 0; i < pMesh->getNumAnimations(); i++)
+		{
+			Animation* animation = pMesh->getAnimation(i);
+			Animation::VertexTrackIterator it = animation->getVertexTrackIterator();
+			while (it.hasMoreElements())
+			{
+				VertexAnimationTrack* track = it.getNext();
+				track->setAssociatedVertexData(pMesh->getVertexDataByTrackHandle(track->getHandle()));
+			}
+		}
+
+		for (MeshSerializeInfo::AnimationInfoMap::iterator it = info->animationInfo.begin();
+			 it != info->animationInfo.end(); ++it)
+		{
+			Animation* animation = pMesh->getAnimation(it->first);
+			readAnimationData(stream, pMesh, it->second, animation);
+		}
+	}
+	//---------------------------------------------------------------------
+	void MeshSerializerImpl::readAnimationData(DataStreamPtr& stream, Mesh* pMesh, MeshAnimationInfo& info, Animation* animation)
+	{
+		for (MeshAnimationInfo::AnimationTrackInfoMap::iterator it = info.animationTrackInfo.begin();
+			 it != info.animationTrackInfo.end(); ++it)
+		{
+			AnimationTrack* track = animation->getVertexTrack(it->first);
+			readAnimationTrackData(stream, pMesh, it->second, track);
+		}
+	}
+	//---------------------------------------------------------------------
+	void MeshSerializerImpl::readAnimationTrackData(DataStreamPtr& stream, Mesh* pMesh, MeshAnimationTrackInfo& info, AnimationTrack* track)
+	{
+		VertexAnimationTrack* vertexTrack = (VertexAnimationTrack*)track;
+		for (MeshAnimationTrackInfo::BufferInfoMap::iterator it = info.bufferInfo.begin();
+			 it != info.bufferInfo.end(); ++it)
+		{
+			VertexMorphKeyFrame* kf = (VertexMorphKeyFrame*)it->first;
+			MeshAnimationTrackInfo::BufferInfo& bufferInfo = it->second;
+
+			stream->seek(bufferInfo.offset);
+
+			// Create buffer, allow read and use shadow buffer
+			size_t vertexCount = vertexTrack->getAssociatedVertexData()->vertexCount;
+			size_t vertexSize = bufferInfo.vertexSize;
+			HardwareVertexBufferSharedPtr vbuf =
+				HardwareBufferManager::getSingleton().createVertexBuffer(
+					vertexSize, vertexCount,
+					HardwareBuffer::HBU_STATIC, true);
+			// float x,y,z			// repeat by number of vertices in original geometry
+			float* pDst = static_cast<float*>(
+				vbuf->lock(HardwareBuffer::HBL_DISCARD));
+			readFloats(stream, pDst, vertexCount * vertexSize);
+			vbuf->unlock();
+			kf->setVertexBuffer(vbuf);
+		}
+	}
     //---------------------------------------------------------------------
     void MeshSerializerImpl::writeMesh(const Mesh* pMesh)
     {
@@ -628,14 +912,21 @@ namespace Ogre {
     }
     //---------------------------------------------------------------------
     void MeshSerializerImpl::readGeometry(DataStreamPtr& stream, Mesh* pMesh,
-        VertexData* dest)
+        VertexData* dest, MeshVertexDataInfo* destInfo)
     {
+		unsigned int vertexCount = 0;
+		readInts(stream, &vertexCount, 1);
 
-        dest->vertexStart = 0;
-
-        unsigned int vertexCount = 0;
-        readInts(stream, &vertexCount, 1);
-        dest->vertexCount = vertexCount;
+		if (destInfo)
+		{
+			destInfo->vertexStart = 0;
+			destInfo->vertexCount = vertexCount;
+		}
+		else
+		{
+			dest->vertexStart = 0;
+			dest->vertexCount = vertexCount;
+		}
 
         // Find optional geometry streams
         if (!stream->eof())
@@ -648,10 +939,10 @@ namespace Ogre {
                 switch (streamID)
                 {
                 case M_GEOMETRY_VERTEX_DECLARATION:
-                    readGeometryVertexDeclaration(stream, pMesh, dest);
+                    readGeometryVertexDeclaration(stream, pMesh, dest, destInfo);
                     break;
                 case M_GEOMETRY_VERTEX_BUFFER:
-                    readGeometryVertexBuffer(stream, pMesh, dest);
+                    readGeometryVertexBuffer(stream, pMesh, dest, destInfo);
                     break;
                 }
                 // Get next stream
@@ -668,7 +959,7 @@ namespace Ogre {
         }
 
 		// Perform any necessary colour conversion for an active rendersystem
-		if (Root::getSingletonPtr() && Root::getSingleton().getRenderSystem())
+		if (dest && Root::getSingletonPtr() && Root::getSingleton().getRenderSystem())
 		{
 			// We don't know the source type if it's VET_COLOUR, but assume ARGB
 			// since that's the most common. Won't get used unless the mesh is
@@ -679,7 +970,7 @@ namespace Ogre {
     }
     //---------------------------------------------------------------------
     void MeshSerializerImpl::readGeometryVertexDeclaration(DataStreamPtr& stream,
-        Mesh* pMesh, VertexData* dest)
+        Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo)
     {
         // Find optional geometry streams
         if (!stream->eof())
@@ -691,7 +982,7 @@ namespace Ogre {
                 switch (streamID)
                 {
                 case M_GEOMETRY_VERTEX_ELEMENT:
-                    readGeometryVertexElement(stream, pMesh, dest);
+                    readGeometryVertexElement(stream, pMesh, dest, destInfo);
                     break;
                 }
                 // Get next stream
@@ -710,7 +1001,7 @@ namespace Ogre {
 	}
     //---------------------------------------------------------------------
     void MeshSerializerImpl::readGeometryVertexElement(DataStreamPtr& stream,
-        Mesh* pMesh, VertexData* dest)
+        Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* info)
     {
 		unsigned short source, offset, index, tmp;
 		VertexElementType vType;
@@ -728,7 +1019,10 @@ namespace Ogre {
 		// unsigned short index;	// index of the semantic
 		readShorts(stream, &index, 1);
 
-		dest->vertexDeclaration->addElement(source, offset, vType, vSemantic, index);
+		if (info)
+			info->vertexDeclaration.addElement(source, offset, vType, vSemantic, index);
+		else
+			dest->vertexDeclaration->addElement(source, offset, vType, vSemantic, index);
 
 		if (vType == VET_COLOUR)
 		{
@@ -741,7 +1035,7 @@ namespace Ogre {
 	}
     //---------------------------------------------------------------------
     void MeshSerializerImpl::readGeometryVertexBuffer(DataStreamPtr& stream,
-        Mesh* pMesh, VertexData* dest)
+        Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo)
     {
 		unsigned short bindIndex, vertexSize;
 		// unsigned short bindIndex;	// Index to bind this buffer to
@@ -758,33 +1052,41 @@ namespace Ogre {
             	"MeshSerializerImpl::readGeometryVertexBuffer");
 		}
 		// Check that vertex size agrees
-		if (dest->vertexDeclaration->getVertexSize(bindIndex) != vertexSize)
+		if ((dest && dest->vertexDeclaration->getVertexSize(bindIndex) != vertexSize) ||
+			(destInfo && destInfo->vertexDeclaration.getVertexSize(bindIndex) != vertexSize))
 		{
 			OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR, "Buffer vertex size does not agree with vertex declaration",
             	"MeshSerializerImpl::readGeometryVertexBuffer");
 		}
 
-		// Create / populate vertex buffer
-		HardwareVertexBufferSharedPtr vbuf;
-        vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
-            vertexSize,
-            dest->vertexCount,
-            pMesh->mVertexBufferUsage,
-			pMesh->mVertexBufferShadowBuffer);
-        void* pBuf = vbuf->lock(HardwareBuffer::HBL_DISCARD);
-        stream->read(pBuf, dest->vertexCount * vertexSize);
+		if (dest)
+		{
+			// Create / populate vertex buffer
+			HardwareVertexBufferSharedPtr vbuf;
+			vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
+				vertexSize,
+				dest->vertexCount,
+				pMesh->mVertexBufferUsage,
+				pMesh->mVertexBufferShadowBuffer);
+			void* pBuf = vbuf->lock(HardwareBuffer::HBL_DISCARD);
+			stream->read(pBuf, dest->vertexCount * vertexSize);
 
-		// endian conversion for OSX
-		flipFromLittleEndian(
-			pBuf,
-			dest->vertexCount,
-			vertexSize,
-			dest->vertexDeclaration->findElementsBySource(bindIndex));
-        vbuf->unlock();
+			// endian conversion for OSX
+			flipFromLittleEndian(
+				pBuf,
+				dest->vertexCount,
+				vertexSize,
+				dest->vertexDeclaration->findElementsBySource(bindIndex));
+			vbuf->unlock();
 
-		// Set binding
-        dest->vertexBufferBinding->setBinding(bindIndex, vbuf);
-
+			// Set binding
+			dest->vertexBufferBinding->setBinding(bindIndex, vbuf);
+		}
+		else
+		{
+			destInfo->vertexBufferInfo[bindIndex].offset = stream->tell();
+			stream->skip(destInfo->vertexCount * vertexSize);
+		}
 	}
     //---------------------------------------------------------------------
 	void MeshSerializerImpl::readSubMeshNameTable(DataStreamPtr& stream, Mesh* pMesh)
@@ -838,7 +1140,7 @@ namespace Ogre {
 
 	}
     //---------------------------------------------------------------------
-    void MeshSerializerImpl::readMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializerListener *listener)
+    void MeshSerializerImpl::readMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info, MeshSerializerListener *listener)
     {
         // Never automatically build edge lists for this version
         // expect them in the file or not at all
@@ -868,9 +1170,13 @@ namespace Ogre {
                 switch(streamID)
                 {
 				case M_GEOMETRY:
-					pMesh->sharedVertexData = OGRE_NEW VertexData();
+					if (info)
+						info->sharedVertexDataInfo = OGRE_NEW MeshVertexDataInfo();
+					else
+						pMesh->sharedVertexData = OGRE_NEW VertexData();
 					try {
-						readGeometry(stream, pMesh, pMesh->sharedVertexData);
+						readGeometry(stream, pMesh, pMesh->sharedVertexData,
+									 info->sharedVertexDataInfo);
 					}
 					catch (Exception& e)
 					{
@@ -879,6 +1185,11 @@ namespace Ogre {
 							// duff geometry data entry with 0 vertices
 							OGRE_DELETE pMesh->sharedVertexData;
 							pMesh->sharedVertexData = 0;
+							if (info)
+							{
+								OGRE_DELETE info->sharedVertexDataInfo;
+								info->sharedVertexDataInfo = 0;
+							}
 							// Skip this stream (pointer will have been returned to just after header)
 							stream->skip(mCurrentstreamLen - MSTREAM_OVERHEAD_SIZE);
 						}
@@ -889,7 +1200,7 @@ namespace Ogre {
 					}
 					break;
                 case M_SUBMESH:
-                    readSubMesh(stream, pMesh, listener);
+                    readSubMesh(stream, pMesh, info, listener);
                     break;
                 case M_MESH_SKELETON_LINK:
                     readSkeletonLink(stream, pMesh, listener);
@@ -898,7 +1209,7 @@ namespace Ogre {
                     readMeshBoneAssignment(stream, pMesh);
                     break;
                 case M_MESH_LOD:
-					readMeshLodInfo(stream, pMesh);
+					readMeshLodInfo(stream, pMesh, info);
 					break;
                 case M_MESH_BOUNDS:
                     readBoundsInfo(stream, pMesh);
@@ -907,13 +1218,13 @@ namespace Ogre {
     	            readSubMeshNameTable(stream, pMesh);
 					break;
                 case M_EDGE_LISTS:
-                    readEdgeList(stream, pMesh);
+                    readEdgeList(stream, pMesh, info);
                     break;
 				case M_POSES:
 					readPoses(stream, pMesh);
 					break;
 				case M_ANIMATIONS:
-					readAnimations(stream, pMesh);
+					readAnimations(stream, pMesh, info);
                     break;
                 case M_TABLE_EXTREMES:
                     readExtremes(stream, pMesh);
@@ -935,11 +1246,12 @@ namespace Ogre {
 
     }
     //---------------------------------------------------------------------
-    void MeshSerializerImpl::readSubMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializerListener *listener)
+    void MeshSerializerImpl::readSubMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info, MeshSerializerListener *listener)
     {
         unsigned short streamID;
 
         SubMesh* sm = pMesh->createSubMesh();
+        uint smIdx = pMesh->getNumSubMeshes() - 1;
 
         // char* materialName
         String materialName = readString(stream);
@@ -961,36 +1273,48 @@ namespace Ogre {
         readBools(stream, &idx32bit, 1);
         if (indexCount > 0)
         {
-            if (idx32bit)
+            if (info)
             {
-                ibuf = HardwareBufferManager::getSingleton().
-                    createIndexBuffer(
-                        HardwareIndexBuffer::IT_32BIT,
-                        sm->indexData->indexCount,
-                        pMesh->mIndexBufferUsage,
-					    pMesh->mIndexBufferShadowBuffer);
-                // unsigned int* faceVertexIndices
-                unsigned int* pIdx = static_cast<unsigned int*>(
-                    ibuf->lock(HardwareBuffer::HBL_DISCARD)
-                    );
-                readInts(stream, pIdx, sm->indexData->indexCount);
-                ibuf->unlock();
-
+				info->submeshes[smIdx].offset = stream->tell();
+                info->submeshes[smIdx].idx32bit = idx32bit;
+                if (idx32bit)
+                    stream->skip(sm->indexData->indexCount * sizeof(int));
+                else
+                    stream->skip(sm->indexData->indexCount * sizeof(short));
             }
-            else // 16-bit
+            else
             {
-                ibuf = HardwareBufferManager::getSingleton().
-                    createIndexBuffer(
-                        HardwareIndexBuffer::IT_16BIT,
-                        sm->indexData->indexCount,
-                        pMesh->mIndexBufferUsage,
-					    pMesh->mIndexBufferShadowBuffer);
-                // unsigned short* faceVertexIndices
-                unsigned short* pIdx = static_cast<unsigned short*>(
-                    ibuf->lock(HardwareBuffer::HBL_DISCARD)
-                    );
-                readShorts(stream, pIdx, sm->indexData->indexCount);
-                ibuf->unlock();
+                if (idx32bit)
+                {
+                    ibuf = HardwareBufferManager::getSingleton().
+                        createIndexBuffer(
+                            HardwareIndexBuffer::IT_32BIT,
+                            sm->indexData->indexCount,
+                            pMesh->mIndexBufferUsage,
+                            pMesh->mIndexBufferShadowBuffer);
+                    // unsigned int* faceVertexIndices
+                    unsigned int* pIdx = static_cast<unsigned int*>(
+                        ibuf->lock(HardwareBuffer::HBL_DISCARD)
+                        );
+                    readInts(stream, pIdx, sm->indexData->indexCount);
+                    ibuf->unlock();
+
+                }
+                else // 16-bit
+                {
+                    ibuf = HardwareBufferManager::getSingleton().
+                        createIndexBuffer(
+                            HardwareIndexBuffer::IT_16BIT,
+                            sm->indexData->indexCount,
+                            pMesh->mIndexBufferUsage,
+                            pMesh->mIndexBufferShadowBuffer);
+                    // unsigned short* faceVertexIndices
+                    unsigned short* pIdx = static_cast<unsigned short*>(
+                        ibuf->lock(HardwareBuffer::HBL_DISCARD)
+                        );
+                    readShorts(stream, pIdx, sm->indexData->indexCount);
+                    ibuf->unlock();
+                }
             }
         }
         sm->indexData->indexBuffer = ibuf;
@@ -1004,8 +1328,17 @@ namespace Ogre {
                 OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR, "Missing geometry data in mesh file",
                     "MeshSerializerImpl::readSubMesh");
             }
-            sm->vertexData = OGRE_NEW VertexData();
-            readGeometry(stream, pMesh, sm->vertexData);
+            if (info)
+            {
+                MeshVertexDataInfo* vertexData = OGRE_NEW MeshVertexDataInfo();
+                info->submeshes[smIdx].vertexDataInfo = vertexData;
+                readGeometry(stream, pMesh, sm->vertexData, vertexData);
+            }
+            else
+            {
+                sm->vertexData = OGRE_NEW VertexData();
+                readGeometry(stream, pMesh, sm->vertexData, 0);
+            }
         }
 
 
@@ -1374,7 +1707,7 @@ namespace Ogre {
 
     }
     //---------------------------------------------------------------------
-	void MeshSerializerImpl::readMeshLodInfo(DataStreamPtr& stream, Mesh* pMesh)
+	void MeshSerializerImpl::readMeshLodInfo(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info)
 	{
 		unsigned short i;
 
@@ -1420,11 +1753,11 @@ namespace Ogre {
 
 			if (pMesh->isLodManual())
 			{
-				readMeshLodUsageManual(stream, pMesh, i, usage);
+				readMeshLodUsageManual(stream, pMesh, i, usage, info);
 			}
 			else //(!pMesh->isLodManual)
 			{
-				readMeshLodUsageGenerated(stream, pMesh, i, usage);
+				readMeshLodUsageGenerated(stream, pMesh, i, usage, info);
 			}
             usage.edgeData = NULL;
 
@@ -1436,7 +1769,7 @@ namespace Ogre {
 	}
     //---------------------------------------------------------------------
 	void MeshSerializerImpl::readMeshLodUsageManual(DataStreamPtr& stream,
-        Mesh* pMesh, unsigned short lodNum, MeshLodUsage& usage)
+        Mesh* pMesh, unsigned short lodNum, MeshLodUsage& usage, MeshSerializeInfo* info)
 	{
 		unsigned long streamID;
 		// Read detail stream
@@ -1453,7 +1786,7 @@ namespace Ogre {
 	}
     //---------------------------------------------------------------------
 	void MeshSerializerImpl::readMeshLodUsageGenerated(DataStreamPtr& stream,
-        Mesh* pMesh, unsigned short lodNum, MeshLodUsage& usage)
+        Mesh* pMesh, unsigned short lodNum, MeshLodUsage& usage, MeshSerializeInfo* info)
 	{
 		usage.manualName = "";
 		usage.manualMesh.setNull();
@@ -1482,35 +1815,48 @@ namespace Ogre {
             // bool indexes32Bit
             bool idx32Bit;
             readBools(stream, &idx32Bit, 1);
-            // unsigned short*/int* faceIndexes;  ((v1, v2, v3) * numFaces)
-            if (idx32Bit)
+            if (info)
             {
-                indexData->indexBuffer = HardwareBufferManager::getSingleton().
-                    createIndexBuffer(HardwareIndexBuffer::IT_32BIT, indexData->indexCount,
-                    pMesh->mIndexBufferUsage, pMesh->mIndexBufferShadowBuffer);
-                unsigned int* pIdx = static_cast<unsigned int*>(
-                    indexData->indexBuffer->lock(
-                        0,
-                        indexData->indexBuffer->getSizeInBytes(),
-                        HardwareBuffer::HBL_DISCARD) );
-
-			    readInts(stream, pIdx, indexData->indexCount);
-                indexData->indexBuffer->unlock();
-
+				MeshLodInfo& lodInfo = info->lodInfo[i];
+				lodInfo.bufferInfoMap[lodNum].offset = stream->tell();
+                lodInfo.bufferInfoMap[lodNum].idx32bit = idx32Bit;
+                if (idx32Bit)
+                    stream->skip(sizeof(int) * indexData->indexCount);
+                else
+                    stream->skip(sizeof(short) * indexData->indexCount);
             }
             else
             {
-                indexData->indexBuffer = HardwareBufferManager::getSingleton().
-                    createIndexBuffer(HardwareIndexBuffer::IT_16BIT, indexData->indexCount,
-                    pMesh->mIndexBufferUsage, pMesh->mIndexBufferShadowBuffer);
-                unsigned short* pIdx = static_cast<unsigned short*>(
-                    indexData->indexBuffer->lock(
-                        0,
-                        indexData->indexBuffer->getSizeInBytes(),
-                        HardwareBuffer::HBL_DISCARD) );
-			    readShorts(stream, pIdx, indexData->indexCount);
-                indexData->indexBuffer->unlock();
+                // unsigned short*/int* faceIndexes;  ((v1, v2, v3) * numFaces)
+                if (idx32Bit)
+                {
+                    indexData->indexBuffer = HardwareBufferManager::getSingleton().
+                        createIndexBuffer(HardwareIndexBuffer::IT_32BIT, indexData->indexCount,
+                        pMesh->mIndexBufferUsage, pMesh->mIndexBufferShadowBuffer);
+                    unsigned int* pIdx = static_cast<unsigned int*>(
+                        indexData->indexBuffer->lock(
+                            0,
+                            indexData->indexBuffer->getSizeInBytes(),
+                            HardwareBuffer::HBL_DISCARD) );
 
+                    readInts(stream, pIdx, indexData->indexCount);
+                    indexData->indexBuffer->unlock();
+
+                }
+                else
+                {
+                    indexData->indexBuffer = HardwareBufferManager::getSingleton().
+                        createIndexBuffer(HardwareIndexBuffer::IT_16BIT, indexData->indexCount,
+                        pMesh->mIndexBufferUsage, pMesh->mIndexBufferShadowBuffer);
+                    unsigned short* pIdx = static_cast<unsigned short*>(
+                        indexData->indexBuffer->lock(
+                            0,
+                            indexData->indexBuffer->getSizeInBytes(),
+                            HardwareBuffer::HBL_DISCARD) );
+                    readShorts(stream, pIdx, indexData->indexCount);
+                    indexData->indexBuffer->unlock();
+
+                }
             }
 
 		}
@@ -1774,7 +2120,7 @@ namespace Ogre {
         }
 	}
     //---------------------------------------------------------------------
-	void MeshSerializerImpl::readEdgeList(DataStreamPtr& stream, Mesh* pMesh)
+	void MeshSerializerImpl::readEdgeList(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info)
 	{
         if (!stream->eof())
         {
@@ -1828,6 +2174,9 @@ namespace Ogre {
                                 (unsigned short)edgeGroup.vertexSet)->vertexData;
                         }
                     }
+
+                    if (info)
+                        info->edgeLodIndices.insert(lodIndex);
                 }
 
                 if (!stream->eof())
@@ -2346,7 +2695,7 @@ namespace Ogre {
 
 	}
 	//---------------------------------------------------------------------
-	void MeshSerializerImpl::readAnimations(DataStreamPtr& stream, Mesh* pMesh)
+	void MeshSerializerImpl::readAnimations(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info)
 	{
 		// Find all substreams
 		if (!stream->eof())
@@ -2358,7 +2707,7 @@ namespace Ogre {
 				switch(streamID)
 				{
 				case M_ANIMATION:
-					readAnimation(stream, pMesh);
+					readAnimation(stream, pMesh, info);
 					break;
 
 				}
@@ -2379,7 +2728,7 @@ namespace Ogre {
 
 	}
 	//---------------------------------------------------------------------
-	void MeshSerializerImpl::readAnimation(DataStreamPtr& stream, Mesh* pMesh)
+	void MeshSerializerImpl::readAnimation(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info)
 	{
 
 		// char* name
@@ -2419,7 +2768,7 @@ namespace Ogre {
 				switch(streamID)
 				{
 				case M_ANIMATION_TRACK:
-					readAnimationTrack(stream, anim, pMesh);
+					readAnimationTrack(stream, anim, pMesh, info);
 					break;
 				};
 				if (!stream->eof())
@@ -2437,7 +2786,7 @@ namespace Ogre {
 	}
 	//---------------------------------------------------------------------
 	void MeshSerializerImpl::readAnimationTrack(DataStreamPtr& stream,
-		Animation* anim, Mesh* pMesh)
+		Animation* anim, Mesh* pMesh, MeshSerializeInfo* info)
 	{
 		// ushort type
 		uint16 inAnimType;
@@ -2462,10 +2811,10 @@ namespace Ogre {
 				switch(streamID)
 				{
 				case M_ANIMATION_MORPH_KEYFRAME:
-					readMorphKeyFrame(stream, track);
+					readMorphKeyFrame(stream, track, info);
 					break;
 				case M_ANIMATION_POSE_KEYFRAME:
-					readPoseKeyFrame(stream, track);
+					readPoseKeyFrame(stream, track, info);
 					break;
 				};
 				if (!stream->eof())
@@ -2483,7 +2832,7 @@ namespace Ogre {
 
 	}
 	//---------------------------------------------------------------------
-	void MeshSerializerImpl::readMorphKeyFrame(DataStreamPtr& stream, VertexAnimationTrack* track)
+	void MeshSerializerImpl::readMorphKeyFrame(DataStreamPtr& stream, VertexAnimationTrack* track, MeshSerializeInfo* info)
 	{
 		// float time
 		float timePos;
@@ -2495,23 +2844,42 @@ namespace Ogre {
 
 		VertexMorphKeyFrame* kf = track->createVertexMorphKeyFrame(timePos);
 
-		// Create buffer, allow read and use shadow buffer
-		size_t vertexCount = track->getAssociatedVertexData()->vertexCount;
-		size_t vertexSize = sizeof(float) * (includesNormals ? 6 : 3);
-		HardwareVertexBufferSharedPtr vbuf =
-			HardwareBufferManager::getSingleton().createVertexBuffer(
-				vertexSize, vertexCount,
-				HardwareBuffer::HBU_STATIC, true);
-		// float x,y,z			// repeat by number of vertices in original geometry
-		float* pDst = static_cast<float*>(
-			vbuf->lock(HardwareBuffer::HBL_DISCARD));
-		readFloats(stream, pDst, vertexCount * (includesNormals ? 6 : 3));
-		vbuf->unlock();
-		kf->setVertexBuffer(vbuf);
+		if (info)
+		{
+			const String& name = track->getParent()->getName();
+			uint handle = track->getHandle();
+			size_t vertexCount = 0;
+			if (handle == 0)
+				vertexCount = info->sharedVertexDataInfo->vertexCount;
+			else
+				vertexCount = info->submeshes[handle - 1].vertexDataInfo->vertexCount;
 
+			size_t vertexSize = sizeof(float) * (includesNormals ? 6 : 3);
+			MeshAnimationInfo& animationInfo = info->animationInfo[name];
+			MeshAnimationTrackInfo& animationTrackInfo = animationInfo.animationTrackInfo[track->getHandle()];
+			animationTrackInfo.bufferInfo[kf].offset = stream->tell();
+			animationTrackInfo.bufferInfo[kf].vertexSize = vertexSize;
+			stream->skip(vertexSize * vertexCount);
+		}
+		else
+		{
+			// Create buffer, allow read and use shadow buffer
+			size_t vertexCount = track->getAssociatedVertexData()->vertexCount;
+			size_t vertexSize = sizeof(float) * (includesNormals ? 6 : 3);
+			HardwareVertexBufferSharedPtr vbuf =
+				HardwareBufferManager::getSingleton().createVertexBuffer(
+					vertexSize, vertexCount,
+					HardwareBuffer::HBU_STATIC, true);
+			// float x,y,z			// repeat by number of vertices in original geometry
+			float* pDst = static_cast<float*>(
+				vbuf->lock(HardwareBuffer::HBL_DISCARD));
+			readFloats(stream, pDst, vertexCount * (includesNormals ? 6 : 3));
+			vbuf->unlock();
+			kf->setVertexBuffer(vbuf);
+		}
 	}
 	//---------------------------------------------------------------------
-	void MeshSerializerImpl::readPoseKeyFrame(DataStreamPtr& stream, VertexAnimationTrack* track)
+	void MeshSerializerImpl::readPoseKeyFrame(DataStreamPtr& stream, VertexAnimationTrack* track, MeshSerializeInfo* info)
 	{
 		// float time
 		float timePos;
@@ -2886,7 +3254,7 @@ namespace Ogre {
 		
     }	
     //---------------------------------------------------------------------
-    void MeshSerializerImpl_v1_4::readMeshLodInfo(DataStreamPtr& stream, Mesh* pMesh)
+    void MeshSerializerImpl_v1_4::readMeshLodInfo(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info)
     {
         unsigned short i;
 
@@ -2927,11 +3295,11 @@ namespace Ogre {
 
             if (pMesh->isLodManual())
             {
-                readMeshLodUsageManual(stream, pMesh, i, usage);
+                readMeshLodUsageManual(stream, pMesh, i, usage, info);
             }
             else //(!pMesh->isLodManual)
             {
-                readMeshLodUsageGenerated(stream, pMesh, i, usage);
+                readMeshLodUsageGenerated(stream, pMesh, i, usage, info);
             }
             usage.edgeData = NULL;
 
@@ -3281,28 +3649,35 @@ namespace Ogre {
     {
     }
     //---------------------------------------------------------------------
-    void MeshSerializerImpl_v1_2::readMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializerListener *listener)
+    void MeshSerializerImpl_v1_2::readMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info, MeshSerializerListener *listener)
     {
-        MeshSerializerImpl::readMesh(stream, pMesh, listener);
+        MeshSerializerImpl::readMesh(stream, pMesh, info, listener);
         // Always automatically build edge lists for this version
         pMesh->mAutoBuildEdgeLists = true;
 
     }
     //---------------------------------------------------------------------
     void MeshSerializerImpl_v1_2::readGeometry(DataStreamPtr& stream, Mesh* pMesh,
-        VertexData* dest)
+        VertexData* dest, MeshVertexDataInfo* destInfo)
     {
         unsigned short bindIdx = 0;
 
-        dest->vertexStart = 0;
+		unsigned int vertexCount = 0;
+		readInts(stream, &vertexCount, 1);
 
-        unsigned int vertexCount = 0;
-        readInts(stream, &vertexCount, 1);
-        dest->vertexCount = vertexCount;
-
+		if (destInfo)
+		{
+			destInfo->vertexStart = 0;
+			destInfo->vertexCount = vertexCount;
+		}
+		else
+		{
+			dest->vertexStart = 0;
+			dest->vertexCount = vertexCount;
+		}
         // Vertex buffers
 
-        readGeometryPositions(bindIdx, stream, pMesh, dest);
+        readGeometryPositions(bindIdx, stream, pMesh, dest, destInfo);
         ++bindIdx;
 
         // Find optional geometry streams
@@ -3319,13 +3694,14 @@ namespace Ogre {
                 switch (streamID)
                 {
                 case M_GEOMETRY_NORMALS:
-                    readGeometryNormals(bindIdx++, stream, pMesh, dest);
+                    readGeometryNormals(bindIdx++, stream, pMesh, dest, destInfo);
                     break;
                 case M_GEOMETRY_COLOURS:
-                    readGeometryColours(bindIdx++, stream, pMesh, dest);
+                    readGeometryColours(bindIdx++, stream, pMesh, dest, destInfo);
                     break;
                 case M_GEOMETRY_TEXCOORDS:
-                    readGeometryTexCoords(bindIdx++, stream, pMesh, dest, texCoordSet++);
+                    readGeometryTexCoords(bindIdx++, stream, pMesh, dest, texCoordSet++,
+										  destInfo);
                     break;
                 }
                 // Get next stream
@@ -3343,87 +3719,135 @@ namespace Ogre {
     }
     //---------------------------------------------------------------------
     void MeshSerializerImpl_v1_2::readGeometryPositions(unsigned short bindIdx,
-        DataStreamPtr& stream, Mesh* pMesh, VertexData* dest)
+        DataStreamPtr& stream, Mesh* pMesh, VertexData* dest,
+        MeshVertexDataInfo* destInfo)
     {
-        float *pFloat = 0;
-        HardwareVertexBufferSharedPtr vbuf;
-        // float* pVertices (x, y, z order x numVertices)
-        dest->vertexDeclaration->addElement(bindIdx, 0, VET_FLOAT3, VES_POSITION);
-        vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
-            dest->vertexDeclaration->getVertexSize(bindIdx),
-            dest->vertexCount,
-            pMesh->mVertexBufferUsage,
-			pMesh->mVertexBufferShadowBuffer);
-        pFloat = static_cast<float*>(
-            vbuf->lock(HardwareBuffer::HBL_DISCARD));
-        readFloats(stream, pFloat, dest->vertexCount * 3);
-        vbuf->unlock();
-        dest->vertexBufferBinding->setBinding(bindIdx, vbuf);
+        if (destInfo)
+        {
+            destInfo->vertexDeclaration.addElement(bindIdx, 0, VET_FLOAT3, VES_POSITION);
+            destInfo->vertexBufferInfo[bindIdx].offset = stream->tell();
+            stream->skip(destInfo->vertexCount * 3 * sizeof(float));
+        }
+        else
+        {
+            float *pFloat = 0;
+            HardwareVertexBufferSharedPtr vbuf;
+            // float* pVertices (x, y, z order x numVertices)
+            dest->vertexDeclaration->addElement(bindIdx, 0, VET_FLOAT3, VES_POSITION);
+            vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
+                dest->vertexDeclaration->getVertexSize(bindIdx),
+                dest->vertexCount,
+                pMesh->mVertexBufferUsage,
+                pMesh->mVertexBufferShadowBuffer);
+            pFloat = static_cast<float*>(
+                vbuf->lock(HardwareBuffer::HBL_DISCARD));
+            readFloats(stream, pFloat, dest->vertexCount * 3);
+            vbuf->unlock();
+            dest->vertexBufferBinding->setBinding(bindIdx, vbuf);
+        }
     }
     //---------------------------------------------------------------------
     void MeshSerializerImpl_v1_2::readGeometryNormals(unsigned short bindIdx,
-        DataStreamPtr& stream, Mesh* pMesh, VertexData* dest)
+        DataStreamPtr& stream, Mesh* pMesh, VertexData* dest,
+        MeshVertexDataInfo* destInfo)
     {
-        float *pFloat = 0;
-        HardwareVertexBufferSharedPtr vbuf;
-        // float* pNormals (x, y, z order x numVertices)
-        dest->vertexDeclaration->addElement(bindIdx, 0, VET_FLOAT3, VES_NORMAL);
-        vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
-            dest->vertexDeclaration->getVertexSize(bindIdx),
-            dest->vertexCount,
-            pMesh->mVertexBufferUsage,
-			pMesh->mVertexBufferShadowBuffer);
-        pFloat = static_cast<float*>(
-            vbuf->lock(HardwareBuffer::HBL_DISCARD));
-        readFloats(stream, pFloat, dest->vertexCount * 3);
-        vbuf->unlock();
-        dest->vertexBufferBinding->setBinding(bindIdx, vbuf);
+        if (destInfo)
+        {
+            destInfo->vertexDeclaration.addElement(bindIdx, 0, VET_FLOAT3, VES_NORMAL);
+            destInfo->vertexBufferInfo[bindIdx].offset = stream->tell();
+            stream->skip(destInfo->vertexCount * 3 * sizeof(float));
+        }
+        else
+        {
+            float *pFloat = 0;
+            HardwareVertexBufferSharedPtr vbuf;
+            // float* pNormals (x, y, z order x numVertices)
+            dest->vertexDeclaration->addElement(bindIdx, 0, VET_FLOAT3, VES_NORMAL);
+            vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
+                dest->vertexDeclaration->getVertexSize(bindIdx),
+                dest->vertexCount,
+                pMesh->mVertexBufferUsage,
+                pMesh->mVertexBufferShadowBuffer);
+            pFloat = static_cast<float*>(
+                vbuf->lock(HardwareBuffer::HBL_DISCARD));
+            readFloats(stream, pFloat, dest->vertexCount * 3);
+            vbuf->unlock();
+            dest->vertexBufferBinding->setBinding(bindIdx, vbuf);
+        }
     }
     //---------------------------------------------------------------------
     void MeshSerializerImpl_v1_2::readGeometryColours(unsigned short bindIdx,
-        DataStreamPtr& stream, Mesh* pMesh, VertexData* dest)
+        DataStreamPtr& stream, Mesh* pMesh, VertexData* dest,
+        MeshVertexDataInfo* destInfo)
     {
-        RGBA* pRGBA = 0;
-        HardwareVertexBufferSharedPtr vbuf;
-        // unsigned long* pColours (RGBA 8888 format x numVertices)
-        dest->vertexDeclaration->addElement(bindIdx, 0, VET_COLOUR, VES_DIFFUSE);
-        vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
-            dest->vertexDeclaration->getVertexSize(bindIdx),
-            dest->vertexCount,
-            pMesh->mVertexBufferUsage,
-			pMesh->mVertexBufferShadowBuffer);
-        pRGBA = static_cast<RGBA*>(
-            vbuf->lock(HardwareBuffer::HBL_DISCARD));
-        readInts(stream, pRGBA, dest->vertexCount);
-        vbuf->unlock();
-        dest->vertexBufferBinding->setBinding(bindIdx, vbuf);
+        if (destInfo)
+        {
+            destInfo->vertexDeclaration.addElement(bindIdx, 0, VET_COLOUR, VES_DIFFUSE);
+            destInfo->vertexBufferInfo[bindIdx].offset = stream->tell();
+            stream->skip(destInfo->vertexCount * sizeof(int));
+        }
+        else
+        {
+            RGBA* pRGBA = 0;
+            HardwareVertexBufferSharedPtr vbuf;
+            // unsigned long* pColours (RGBA 8888 format x numVertices)
+            dest->vertexDeclaration->addElement(bindIdx, 0, VET_COLOUR, VES_DIFFUSE);
+            vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
+                dest->vertexDeclaration->getVertexSize(bindIdx),
+                dest->vertexCount,
+                pMesh->mVertexBufferUsage,
+                pMesh->mVertexBufferShadowBuffer);
+            pRGBA = static_cast<RGBA*>(
+                vbuf->lock(HardwareBuffer::HBL_DISCARD));
+            readInts(stream, pRGBA, dest->vertexCount);
+            vbuf->unlock();
+            dest->vertexBufferBinding->setBinding(bindIdx, vbuf);
+        }
     }
     //---------------------------------------------------------------------
     void MeshSerializerImpl_v1_2::readGeometryTexCoords(unsigned short bindIdx,
-        DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, unsigned short texCoordSet)
+        DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, unsigned short texCoordSet,
+        MeshVertexDataInfo* destInfo)
     {
-        float *pFloat = 0;
-        HardwareVertexBufferSharedPtr vbuf;
-        // unsigned short dimensions    (1 for 1D, 2 for 2D, 3 for 3D)
-        unsigned short dim;
-        readShorts(stream, &dim, 1);
-        // float* pTexCoords  (u [v] [w] order, dimensions x numVertices)
-        dest->vertexDeclaration->addElement(
-            bindIdx,
-            0,
-            VertexElement::multiplyTypeCount(VET_FLOAT1, dim),
-            VES_TEXTURE_COORDINATES,
-            texCoordSet);
-        vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
-            dest->vertexDeclaration->getVertexSize(bindIdx),
-            dest->vertexCount,
-            pMesh->mVertexBufferUsage,
-			pMesh->mVertexBufferShadowBuffer);
-        pFloat = static_cast<float*>(
-            vbuf->lock(HardwareBuffer::HBL_DISCARD));
-        readFloats(stream, pFloat, dest->vertexCount * dim);
-        vbuf->unlock();
-        dest->vertexBufferBinding->setBinding(bindIdx, vbuf);
+        if (destInfo)
+        {
+            // unsigned short dimensions    (1 for 1D, 2 for 2D, 3 for 3D)
+            unsigned short dim;
+            readShorts(stream, &dim, 1);
+            destInfo->vertexDeclaration.addElement(
+                bindIdx,
+                0,
+                VertexElement::multiplyTypeCount(VET_FLOAT1, dim),
+                VES_TEXTURE_COORDINATES,
+                texCoordSet);
+            destInfo->vertexBufferInfo[bindIdx].offset = stream->tell();
+            stream->skip(destInfo->vertexCount * dim * sizeof(float));
+        }
+        else
+        {
+            float *pFloat = 0;
+            HardwareVertexBufferSharedPtr vbuf;
+            // unsigned short dimensions    (1 for 1D, 2 for 2D, 3 for 3D)
+            unsigned short dim;
+            readShorts(stream, &dim, 1);
+            // float* pTexCoords  (u [v] [w] order, dimensions x numVertices)
+            dest->vertexDeclaration->addElement(
+                bindIdx,
+                0,
+                VertexElement::multiplyTypeCount(VET_FLOAT1, dim),
+                VES_TEXTURE_COORDINATES,
+                texCoordSet);
+            vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
+                dest->vertexDeclaration->getVertexSize(bindIdx),
+                dest->vertexCount,
+                pMesh->mVertexBufferUsage,
+                pMesh->mVertexBufferShadowBuffer);
+            pFloat = static_cast<float*>(
+                vbuf->lock(HardwareBuffer::HBL_DISCARD));
+            readFloats(stream, pFloat, dest->vertexCount * dim);
+            vbuf->unlock();
+            dest->vertexBufferBinding->setBinding(bindIdx, vbuf);
+        }
     }
     //---------------------------------------------------------------------
     //---------------------------------------------------------------------
@@ -3439,42 +3863,62 @@ namespace Ogre {
     }
     //---------------------------------------------------------------------
     void MeshSerializerImpl_v1_1::readGeometryTexCoords(unsigned short bindIdx,
-        DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, unsigned short texCoordSet)
+        DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, unsigned short texCoordSet,
+        MeshVertexDataInfo* destInfo)
     {
-        float *pFloat = 0;
-        HardwareVertexBufferSharedPtr vbuf;
-        // unsigned short dimensions    (1 for 1D, 2 for 2D, 3 for 3D)
-        unsigned short dim;
-        readShorts(stream, &dim, 1);
-        // float* pTexCoords  (u [v] [w] order, dimensions x numVertices)
-        dest->vertexDeclaration->addElement(
-            bindIdx,
-            0,
-            VertexElement::multiplyTypeCount(VET_FLOAT1, dim),
-            VES_TEXTURE_COORDINATES,
-            texCoordSet);
-        vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
-            dest->vertexDeclaration->getVertexSize(bindIdx),
-            dest->vertexCount,
-            pMesh->getVertexBufferUsage(),
-			pMesh->isVertexBufferShadowed());
-        pFloat = static_cast<float*>(
-            vbuf->lock(HardwareBuffer::HBL_DISCARD));
-        readFloats(stream, pFloat, dest->vertexCount * dim);
-
-        // Adjust individual v values to (1 - v)
-        if (dim == 2)
+        if (destInfo)
         {
-            for (size_t i = 0; i < dest->vertexCount; ++i)
-            {
-                ++pFloat; // skip u
-                *pFloat = 1.0f - *pFloat; // v = 1 - v
-                ++pFloat;
-            }
-
+            // unsigned short dimensions    (1 for 1D, 2 for 2D, 3 for 3D)
+            unsigned short dim;
+            readShorts(stream, &dim, 1);
+            destInfo->vertexDeclaration.addElement(
+                bindIdx,
+                0,
+                VertexElement::multiplyTypeCount(VET_FLOAT1, dim),
+                VES_TEXTURE_COORDINATES,
+                texCoordSet);
+            destInfo->vertexBufferInfo[bindIdx].offset = stream->tell();
+            if (dim == 2)
+                destInfo->vertexBufferInfo[bindIdx].flipY = true;
+            stream->skip(destInfo->vertexCount * dim * sizeof(float));
         }
-        vbuf->unlock();
-        dest->vertexBufferBinding->setBinding(bindIdx, vbuf);
+        else
+        {
+            float *pFloat = 0;
+            HardwareVertexBufferSharedPtr vbuf;
+            // unsigned short dimensions    (1 for 1D, 2 for 2D, 3 for 3D)
+            unsigned short dim;
+            readShorts(stream, &dim, 1);
+            // float* pTexCoords  (u [v] [w] order, dimensions x numVertices)
+            dest->vertexDeclaration->addElement(
+                bindIdx,
+                0,
+                VertexElement::multiplyTypeCount(VET_FLOAT1, dim),
+                VES_TEXTURE_COORDINATES,
+                texCoordSet);
+            vbuf = HardwareBufferManager::getSingleton().createVertexBuffer(
+                dest->vertexDeclaration->getVertexSize(bindIdx),
+                dest->vertexCount,
+                pMesh->getVertexBufferUsage(),
+                pMesh->isVertexBufferShadowed());
+            pFloat = static_cast<float*>(
+                vbuf->lock(HardwareBuffer::HBL_DISCARD));
+            readFloats(stream, pFloat, dest->vertexCount * dim);
+
+            // Adjust individual v values to (1 - v)
+            if (dim == 2)
+            {
+                for (size_t i = 0; i < dest->vertexCount; ++i)
+                {
+                    ++pFloat; // skip u
+                    *pFloat = 1.0f - *pFloat; // v = 1 - v
+                    ++pFloat;
+                }
+
+            }
+            vbuf->unlock();
+            dest->vertexBufferBinding->setBinding(bindIdx, vbuf);
+        }
     }
     //---------------------------------------------------------------------
     //---------------------------------------------------------------------

@@ -41,6 +41,140 @@ namespace Ogre {
 	class MeshSerializerListener;
     class LodStrategy;
 
+    class MeshVertexDataInfo : public GeneralAllocatedObject
+    {
+    public:
+        VertexDeclaration vertexDeclaration;
+        uint vertexStart;
+        uint vertexCount;
+
+        struct BufferInfo
+        {
+            size_t offset;
+            uint vertexSize;
+            bool flipY;
+
+            BufferInfo()
+            {
+                offset = 0;
+                vertexSize = 0;
+                flipY = false;
+            }
+        };
+        typedef map<uint, BufferInfo>::type BufferInfoMap;
+        BufferInfoMap vertexBufferInfo;
+
+        MeshVertexDataInfo()
+        {
+            vertexStart = 0;
+            vertexCount = 0;
+        }
+    };
+
+    class SubMeshInfo : public GeneralAllocatedObject
+    {
+    public:
+        size_t offset;
+        bool idx32bit;
+        MeshVertexDataInfo* vertexDataInfo;
+
+        SubMeshInfo()
+        {
+            offset = 0;
+            idx32bit = false;
+            vertexDataInfo = 0;
+        }
+
+        ~SubMeshInfo()
+        {
+            OGRE_DELETE vertexDataInfo;
+        }
+    };
+
+    class MeshLodInfo : public GeneralAllocatedObject
+    {
+    public:
+        struct BufferInfo
+        {
+            size_t offset;
+            bool idx32bit;
+
+            BufferInfo()
+            {
+                offset = 0;
+                idx32bit = false;
+            }
+        };
+        typedef map<uint, BufferInfo>::type BufferInfoMap;
+        BufferInfoMap bufferInfoMap;
+
+        MeshLodInfo()
+        {
+        }
+    };
+
+    class MeshAnimationTrackInfo : public GeneralAllocatedObject
+    {
+    public:
+        struct BufferInfo
+        {
+            size_t offset;
+            uint vertexSize;
+
+            BufferInfo()
+            {
+                offset = 0;
+                vertexSize = 0;
+            }
+        };
+
+        typedef map<KeyFrame*, BufferInfo>::type BufferInfoMap;
+        BufferInfoMap bufferInfo;
+
+        MeshAnimationTrackInfo()
+        {
+        }
+    };
+
+    class MeshAnimationInfo : public GeneralAllocatedObject
+    {
+    public:
+        typedef map<uint, MeshAnimationTrackInfo>::type AnimationTrackInfoMap;
+        AnimationTrackInfoMap animationTrackInfo;
+
+        MeshAnimationInfo()
+        {
+        }
+    };
+
+    class MeshSerializeInfo : public GeneralAllocatedObject
+    {
+    public:
+        MeshSerializeInfo()
+        {
+            flipEndian = false;
+            sharedVertexDataInfo = 0;
+        }
+
+        ~MeshSerializeInfo()
+        {
+            OGRE_DELETE sharedVertexDataInfo;
+        }
+
+        String meshVersionString;
+        bool flipEndian;
+        MeshVertexDataInfo* sharedVertexDataInfo;
+        typedef map<uint, SubMeshInfo>::type SubMeshInfoMap;
+        SubMeshInfoMap submeshes;
+        typedef map<uint, MeshLodInfo>::type LodInfoMap;
+        LodInfoMap lodInfo;
+        typedef set<uint>::type EdgeLoadIndexList;
+        EdgeLoadIndexList edgeLodIndices;
+        typedef map<String, MeshAnimationInfo>::type AnimationInfoMap;
+        AnimationInfoMap animationInfo;
+    };
+
+
 	/** \addtogroup Core
 	*  @{
 	*/
@@ -81,7 +215,9 @@ namespace Ogre {
         @param stream The DataStream holding the .mesh data. Must be initialised (pos at the start of the buffer).
         @param pDest Pointer to the Mesh object which will receive the data. Should be blank already.
         */
-        void importMesh(DataStreamPtr& stream, Mesh* pDest, MeshSerializerListener *listener);
+        void importMesh(DataStreamPtr& stream, Mesh* pDest, MeshSerializeInfo* info, MeshSerializerListener *listener);
+
+        void importMeshVertexData(DataStreamPtr& stream, Mesh* pDest, MeshSerializeInfo* info);
 
     protected:
 
@@ -136,37 +272,46 @@ namespace Ogre {
 
         virtual void readTextureLayer(DataStreamPtr& stream, Mesh* pMesh, MaterialPtr& pMat);
         virtual void readSubMeshNameTable(DataStreamPtr& stream, Mesh* pMesh);
-        virtual void readMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializerListener *listener);
-        virtual void readSubMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializerListener *listener);
+        virtual void readMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info, MeshSerializerListener *listener);
+        virtual void readSubMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info, MeshSerializerListener *listener);
         virtual void readSubMeshOperation(DataStreamPtr& stream, Mesh* pMesh, SubMesh* sub);
         virtual void readSubMeshTextureAlias(DataStreamPtr& stream, Mesh* pMesh, SubMesh* sub);
-        virtual void readGeometry(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest);
-        virtual void readGeometryVertexDeclaration(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest);
-        virtual void readGeometryVertexElement(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest);
-        virtual void readGeometryVertexBuffer(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest);
+        virtual void readGeometry(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo);
+        virtual void readGeometryVertexDeclaration(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo);
+        virtual void readGeometryVertexElement(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo);
+        virtual void readGeometryVertexBuffer(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo);
 
         virtual void readSkeletonLink(DataStreamPtr& stream, Mesh* pMesh, MeshSerializerListener *listener);
         virtual void readMeshBoneAssignment(DataStreamPtr& stream, Mesh* pMesh);
         virtual void readSubMeshBoneAssignment(DataStreamPtr& stream, Mesh* pMesh, 
             SubMesh* sub);
-        virtual void readMeshLodInfo(DataStreamPtr& stream, Mesh* pMesh);
+        virtual void readMeshLodInfo(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info);
         virtual void readMeshLodUsageManual(DataStreamPtr& stream, Mesh* pMesh, 
-            unsigned short lodNum, MeshLodUsage& usage);
+            unsigned short lodNum, MeshLodUsage& usage, MeshSerializeInfo* info);
         virtual void readMeshLodUsageGenerated(DataStreamPtr& stream, Mesh* pMesh, 
-            unsigned short lodNum, MeshLodUsage& usage);
+            unsigned short lodNum, MeshLodUsage& usage, MeshSerializeInfo* info);
         virtual void readBoundsInfo(DataStreamPtr& stream, Mesh* pMesh);
-        virtual void readEdgeList(DataStreamPtr& stream, Mesh* pMesh);
+        virtual void readEdgeList(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info);
         virtual void readEdgeListLodInfo(DataStreamPtr& stream, EdgeData* edgeData);
 		virtual void readPoses(DataStreamPtr& stream, Mesh* pMesh);
 		virtual void readPose(DataStreamPtr& stream, Mesh* pMesh);
-		virtual void readAnimations(DataStreamPtr& stream, Mesh* pMesh);
-		virtual void readAnimation(DataStreamPtr& stream, Mesh* pMesh);
+		virtual void readAnimations(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info);
+		virtual void readAnimation(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info);
 		virtual void readAnimationTrack(DataStreamPtr& stream, Animation* anim, 
-			Mesh* pMesh);
-		virtual void readMorphKeyFrame(DataStreamPtr& stream, VertexAnimationTrack* track);
-		virtual void readPoseKeyFrame(DataStreamPtr& stream, VertexAnimationTrack* track);
+			Mesh* pMesh, MeshSerializeInfo* info);
+		virtual void readMorphKeyFrame(DataStreamPtr& stream, VertexAnimationTrack* track, MeshSerializeInfo* info);
+		virtual void readPoseKeyFrame(DataStreamPtr& stream, VertexAnimationTrack* track, MeshSerializeInfo* info);
 		virtual void readExtremes(DataStreamPtr& stream, Mesh *pMesh);
 
+
+        virtual void readGeometryData(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo);
+        virtual void readGeometryVertexBufferData(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo, uint bindIndex, const MeshVertexDataInfo::BufferInfo& bufferInfo);
+        virtual void readLodData(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info);
+        virtual void readEdgeListData(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info);
+        virtual void readAnimationsData(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info);
+        virtual void readAnimationData(DataStreamPtr& stream, Mesh* pMesh, MeshAnimationInfo& info, Animation* animation);
+        virtual void readAnimationTrackData(DataStreamPtr& stream, Mesh* pMesh, MeshAnimationTrackInfo& info, AnimationTrack* track);
+        virtual void readSubMeshData(DataStreamPtr& stream, Mesh* pMesh, SubMesh* sm, SubMeshInfo& smInfo);
 
         /// Flip an entire vertex buffer from little endian
         virtual void flipFromLittleEndian(void* pData, size_t vertexCount, size_t vertexSize, const VertexDeclaration::VertexElementList& elems);
@@ -212,7 +357,7 @@ namespace Ogre {
 		virtual void writeLodUsageGenerated(const Mesh* pMesh, const MeshLodUsage& usage,
 									unsigned short lodNum);
 
-        virtual void readMeshLodInfo(DataStreamPtr& stream, Mesh* pMesh);
+        virtual void readMeshLodInfo(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info);
     };
 
     /** Class for providing backwards-compatibility for loading version 1.3 of the .mesh format. 
@@ -241,16 +386,16 @@ namespace Ogre {
         MeshSerializerImpl_v1_2();
         ~MeshSerializerImpl_v1_2();
     protected:
-        virtual void readMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializerListener *listener);
-        virtual void readGeometry(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest);
+        virtual void readMesh(DataStreamPtr& stream, Mesh* pMesh, MeshSerializeInfo* info, MeshSerializerListener *listener);
+        virtual void readGeometry(DataStreamPtr& stream, Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo);
         virtual void readGeometryPositions(unsigned short bindIdx, DataStreamPtr& stream, 
-            Mesh* pMesh, VertexData* dest);
+            Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo);
         virtual void readGeometryNormals(unsigned short bindIdx, DataStreamPtr& stream, 
-            Mesh* pMesh, VertexData* dest);
+            Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo);
         virtual void readGeometryColours(unsigned short bindIdx, DataStreamPtr& stream, 
-            Mesh* pMesh, VertexData* dest);
+            Mesh* pMesh, VertexData* dest, MeshVertexDataInfo* destInfo);
         virtual void readGeometryTexCoords(unsigned short bindIdx, DataStreamPtr& stream, 
-            Mesh* pMesh, VertexData* dest, unsigned short set);
+            Mesh* pMesh, VertexData* dest, unsigned short set, MeshVertexDataInfo* destInfo);
     };
 
     /** Class for providing backwards-compatibility for loading version 1.1 of the .mesh format. 
@@ -263,7 +408,7 @@ namespace Ogre {
         ~MeshSerializerImpl_v1_1();
     protected:
         void readGeometryTexCoords(unsigned short bindIdx, DataStreamPtr& stream, 
-            Mesh* pMesh, VertexData* dest, unsigned short set);
+            Mesh* pMesh, VertexData* dest, unsigned short set, MeshVertexDataInfo* destInfo);
     };
 
 	/** @} */

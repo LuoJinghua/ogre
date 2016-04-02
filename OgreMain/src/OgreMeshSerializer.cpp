@@ -146,7 +146,8 @@ namespace Ogre {
 		impl->exportMesh(pMesh, stream, endianMode);
 	}
     //---------------------------------------------------------------------
-    void MeshSerializer::importMesh(DataStreamPtr& stream, Mesh* pDest)
+    void MeshSerializer::importMesh(DataStreamPtr& stream, Mesh* pDest,
+                                    MeshSerializeInfo* info)
     {
         determineEndianness(stream);
 
@@ -182,7 +183,7 @@ namespace Ogre {
 						"mesh version " + ver, "MeshSerializer::importMesh");
 		
         // Call implementation
-        impl->importMesh(stream, pDest, mListener);
+        impl->importMesh(stream, pDest, info, mListener);
         // Warn on old version of mesh
         if (ver != mVersionData[0]->versionString)
         {
@@ -191,8 +192,37 @@ namespace Ogre {
                 " using the OgreMeshUpgrade tool.", LML_CRITICAL);
         }
 
-		if(mListener)
+        if (info)
+        {
+            info->meshVersionString = ver;
+            info->flipEndian = mFlipEndian;
+        }
+
+		if(mListener && !info)
 			mListener->processMeshCompleted(pDest);
+    }
+    //---------------------------------------------------------------------
+    void MeshSerializer::importMeshVertexData(DataStreamPtr& stream, Mesh* pDest,
+                                              MeshSerializeInfo* meshInfo)
+    {
+        MeshSerializerImpl* impl = 0;
+        for (MeshVersionDataList::iterator i = mVersionData.begin();
+             i != mVersionData.end(); ++i)
+        {
+            if ((*i)->versionString == meshInfo->meshVersionString)
+            {
+                impl = (*i)->impl;
+                break;
+            }
+        }
+        if (!impl)
+            OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR, "Cannot find serializer implementation for "
+                        "mesh version " + meshInfo->meshVersionString, "MeshSerializer::importMesh");
+
+        impl->importMeshVertexData(stream, pDest, meshInfo);
+
+        if(mListener)
+            mListener->processMeshCompleted(pDest);
     }
     //---------------------------------------------------------------------
 	void MeshSerializer::setListener(Ogre::MeshSerializerListener *listener)

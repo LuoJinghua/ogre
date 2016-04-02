@@ -152,7 +152,18 @@ namespace Ogre {
         @param stream The DataStream holding the .mesh data. Must be initialised (pos at the start of the buffer).
         @param pDest Pointer to the Mesh object which will receive the data. Should be blank already.
         */
-        void importMesh(DataStreamPtr& stream, Mesh* pDest);
+        void importMesh(DataStreamPtr& stream, Mesh* pDest,
+						MeshSerializeInfo* meshInfo = 0);
+
+		/** Imports Mesh vertex data from a .mesh file DataStream.
+		 @remarks
+		 This method imports data from a DataStream opened from a .mesh file and places it's
+		 contents into the Mesh object which is passed in.
+		 @param stream The DataStream holding the .mesh data. Must be initialised (pos at the start of the buffer).
+		 @param pDest Pointer to the Mesh object which will receive the data. Should be blank already.
+		 */
+		void importMeshVertexData(DataStreamPtr& stream, Mesh* pDest,
+								  MeshSerializeInfo* meshInfo);
 
 		/// Sets the listener for this serializer
 		void setListener(MeshSerializerListener *listener);

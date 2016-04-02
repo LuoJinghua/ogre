@@ -80,6 +80,7 @@ namespace Ogre {
         lod.manualMesh.setNull();
 		mMeshLodUsageList.push_back(lod);
 
+        mSerializeInfo = 0;
     }
     //-----------------------------------------------------------------------
     Mesh::~Mesh()
@@ -233,11 +234,23 @@ namespace Ogre {
  
         // fully prebuffer into host RAM
         mFreshFromDisk = DataStreamPtr(OGRE_NEW MemoryDataStream(mName,mFreshFromDisk));
+
+        MeshSerializer serializer;
+        serializer.setListener(MeshManager::getSingleton().getListener());
+
+        mSerializeInfo = OGRE_NEW MeshSerializeInfo();
+        serializer.importMesh(mFreshFromDisk, this, mSerializeInfo);
     }
     //-----------------------------------------------------------------------
     void Mesh::unprepareImpl()
     {
         mFreshFromDisk.setNull();
+
+        if (mSerializeInfo)
+            unloadImpl();
+
+        OGRE_DELETE mSerializeInfo;
+        mSerializeInfo = 0;
     }
     void Mesh::loadImpl()
     {
@@ -249,13 +262,17 @@ namespace Ogre {
         DataStreamPtr data(mFreshFromDisk);
         mFreshFromDisk.setNull();
 
-        if (data.isNull()) {
+        typedef SharedPtr<MeshSerializeInfo> MeshSerializeInfoPtr;
+        MeshSerializeInfoPtr serializeInfo = MeshSerializeInfoPtr(mSerializeInfo);
+        mSerializeInfo = 0;
+
+        if (data.isNull() || serializeInfo.isNull()) {
             OGRE_EXCEPT(Exception::ERR_INVALID_STATE,
                         "Data doesn't appear to have been prepared in " + mName,
                         "Mesh::loadImpl()");
         }
 
-		serializer.importMesh(data, this);
+        serializer.importMeshVertexData(data, this, serializeInfo.get());
 
         /* check all submeshes to see if their materials should be
            updated.  If the submesh has texture aliases that match those
@@ -296,6 +313,9 @@ namespace Ogre {
 
         // Removes reference to skeleton
         setSkeletonName(StringUtil::BLANK);
+
+        OGRE_DELETE mSerializeInfo;
+        mSerializeInfo = 0;
     }
 
     //-----------------------------------------------------------------------
