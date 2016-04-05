@@ -526,6 +526,9 @@ namespace Ogre {
 	protected:
 		VertexBufferBindingMap mBindingMap;
 		mutable unsigned short mHighIndex;
+		mutable bool mHasInstanceData;
+		mutable bool mDirty;
+
 	public:
 		/// Constructor, should not be called direct, use HardwareBufferManager::createVertexBufferBinding
 		VertexBufferBinding();

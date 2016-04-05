@@ -713,7 +713,9 @@ namespace Ogre {
 		return texCoord;
 	}
     //-----------------------------------------------------------------------------
-	VertexBufferBinding::VertexBufferBinding() : mHighIndex(0)
+	VertexBufferBinding::VertexBufferBinding() : mHighIndex(0),
+        mHasInstanceData(false),
+        mDirty(false)
 	{
 	}
     //-----------------------------------------------------------------------------
@@ -728,6 +730,7 @@ namespace Ogre {
         // reference count to decrement on that buffer (possibly destroying it)
 		mBindingMap[index] = buffer;
 		mHighIndex = std::max(mHighIndex, (unsigned short)(index+1));
+        mDirty = true;
 	}
     //-----------------------------------------------------------------------------
 	void VertexBufferBinding::unsetBinding(unsigned short index)
@@ -740,12 +743,15 @@ namespace Ogre {
 				"VertexBufferBinding::unsetBinding");
 		}
 		mBindingMap.erase(i);
+        mDirty = true;
 	}
     //-----------------------------------------------------------------------------
     void VertexBufferBinding::unsetAllBindings(void)
     {
         mBindingMap.clear();
         mHighIndex = 0;
+        mHasInstanceData = false;
+        mDirty = false;
     }
     //-----------------------------------------------------------------------------
 	const VertexBufferBinding::VertexBufferBindingMap& 
@@ -804,12 +810,18 @@ namespace Ogre {
     //-----------------------------------------------------------------------------
     bool VertexBufferBinding::hasInstanceData() const
     {
+        if (!mDirty)
+            return mHasInstanceData;
+
+        mDirty = false;
+        mHasInstanceData = false;
 		VertexBufferBinding::VertexBufferBindingMap::const_iterator i, iend;
 		iend = mBindingMap.end();
 		for (i = mBindingMap.begin(); i != iend; ++i)
 		{
 			if ( i->second->isInstanceData() )
             {
+                mHasInstanceData = true;
                 return true;
             }
         }
