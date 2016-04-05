@@ -423,17 +423,24 @@ namespace Ogre {
         if(iter != mEnableVector.end())
         {
             mEnableVector.erase(iter);
-            
+
             OGRE_CHECK_GL_ERROR(glDisable(flag));
         }
     }
 
     void GLES2StateCacheManagerImp::setVertexAttribEnabled(GLuint attrib)
     {
-        bool found = mEnabledVertexAttribs.find(attrib) != mEnabledVertexAttribs.end();
-        if(!found)
+        typedef map<GLuint, bool>::type VertexAttribList;
+        VertexAttribList::iterator iter = mEnabledVertexAttribs.find(attrib);
+        if(iter == mEnabledVertexAttribs.end())
         {
-            mEnabledVertexAttribs.insert(attrib);
+            mEnabledVertexAttribs.insert(VertexAttribList::value_type(attrib, true));
+
+            OGRE_CHECK_GL_ERROR(glEnableVertexAttribArray(attrib));
+        }
+        else if (!iter->second)
+        {
+            iter->second = true;
 
             OGRE_CHECK_GL_ERROR(glEnableVertexAttribArray(attrib));
         }
@@ -441,10 +448,10 @@ namespace Ogre {
 
     void GLES2StateCacheManagerImp::setVertexAttribDisabled(GLuint attrib)
     {
-        set<GLuint>::iterator iter = mEnabledVertexAttribs.find(attrib);
-        if(iter != mEnabledVertexAttribs.end())
+        map<GLuint, bool>::iterator iter = mEnabledVertexAttribs.find(attrib);
+        if(iter != mEnabledVertexAttribs.end() && iter->second)
         {
-            mEnabledVertexAttribs.erase(iter);
+            iter->second = false;
 
             OGRE_CHECK_GL_ERROR(glDisableVertexAttribArray(attrib));
         }

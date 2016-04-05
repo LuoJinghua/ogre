@@ -76,7 +76,7 @@ namespace Ogre
         /// Stores the current colour write mask
         vector<GLboolean>::type mColourMask;
         /// Stores the currently enabled vertex attributes
-        set<GLuint>::type mEnabledVertexAttribs;
+        map<GLuint, bool>::type mEnabledVertexAttribs;
         /// Stores the current depth write mask
         GLboolean mDepthMask;
         /// Stores the current polygon rendering mode
