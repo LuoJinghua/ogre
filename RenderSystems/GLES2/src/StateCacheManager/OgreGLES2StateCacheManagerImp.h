@@ -31,30 +31,38 @@ THE SOFTWARE.
 
 #include "OgreGLES2Prerequisites.h"
 
+#include <string.h>
+
 typedef Ogre::GeneralAllocatedObject StateCacheAlloc;
 
 namespace Ogre
 {
+    struct GLES2SamplerState;
+
     /** An in memory cache of the OpenGL ES2 state.
      @see GLES2StateCacheManager
      */
     class _OgreGLES2Export GLES2StateCacheManagerImp : public StateCacheAlloc
     {
     private:
-        typedef HashMap<GLenum, GLuint> BindBufferMap;
-        typedef HashMap<GLenum, GLint> TexParameteriMap;
-        typedef HashMap<GLenum, GLfloat> TexParameterfMap;
+        typedef map<GLenum, GLuint>::type BindBufferMap;
+        typedef map<GLenum, GLint>::type TexParameteriMap;
+        typedef map<GLenum, GLfloat>::type TexParameterfMap;
 
         struct TextureUnitParams
         {
-            ~TextureUnitParams()
+            TextureUnitParams()
             {
-                mTexParameteriMap.clear();
-                mTexParameterfMap.clear();
+                mValidTexParameteri = 0;
+                mValidTexParameterf = 0;
+                memset(mTexParameteri, 0, sizeof(mTexParameteri));
+                memset(mTexParameterf, 0, sizeof(mTexParameterf));
             }
 
-            TexParameteriMap mTexParameteriMap;
-            TexParameterfMap mTexParameterfMap;
+            uint32 mValidTexParameteri;
+            GLint mTexParameteri[TEXTURE_INTEGER_PARAMETER_MAX];
+            uint32 mValidTexParameterf;
+            GLfloat mTexParameterf[TEXTURE_FLOAT_PARAMETER_MAX];
         };
 
         typedef map<GLuint, TextureUnitParams>::type TexUnitsMap;
@@ -207,6 +215,9 @@ namespace Ogre
         
         /// See GLES2StateCacheManager.setCullFace.
         void setCullFace(GLenum face);
+
+        /// See GLES2StateCacheManager.setSamplerState.
+        void setSamplerState(size_t texUnit, const GLES2SamplerState& state);
     };
 }
 

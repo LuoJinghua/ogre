@@ -51,6 +51,84 @@ namespace Ogre {
         mImp = 0;
     }
 
+    GLenum GLES2StateCacheManager::getGLTextureIntegerParameter(TextureIntegerParameter parameter)
+    {
+        switch (parameter)
+        {
+            case TEXTURE_MIN_FILTER:
+                return GL_TEXTURE_MIN_FILTER;
+            case TEXTURE_MAG_FILTER:
+                return GL_TEXTURE_MAG_FILTER;
+            case TEXTURE_WRAP_T:
+                return GL_TEXTURE_WRAP_T;
+            case TEXTURE_WRAP_S:
+                return GL_TEXTURE_WRAP_S;
+            case TEXTURE_WRAP_R:
+                return GL_TEXTURE_WRAP_R_OES;
+            case TEXTURE_COMPARE_MODE:
+                return GL_TEXTURE_COMPARE_MODE_EXT;
+            case TEXTURE_COMPARE_FUNC:
+                return GL_TEXTURE_COMPARE_FUNC_EXT;
+            case TEXTURE_MAX_LEVEL:
+                return GL_TEXTURE_MAX_LEVEL_APPLE;
+            default:
+                assert(false && "Unexpected parameter!");
+        }
+
+        return 0;
+    }
+
+    GLenum GLES2StateCacheManager::getGLTextureFloatParameter(TextureFloatParameter parameter)
+    {
+        switch (parameter)
+        {
+            case TEXTURE_MAX_ANISOTROPY:
+                return GL_TEXTURE_MAX_ANISOTROPY_EXT;
+            default:
+                assert(false && "Unexpected parameter!");
+        }
+        return 0;
+    }
+
+    TextureIntegerParameter GLES2StateCacheManager::getTextureIntegerParameter(GLenum parameter)
+    {
+        switch (parameter)
+        {
+            case GL_TEXTURE_MIN_FILTER:
+                return TEXTURE_MIN_FILTER;
+            case GL_TEXTURE_MAG_FILTER:
+                return TEXTURE_MAG_FILTER;
+            case GL_TEXTURE_WRAP_T:
+                return TEXTURE_WRAP_T;
+            case GL_TEXTURE_WRAP_S:
+                return TEXTURE_WRAP_S;
+            case GL_TEXTURE_WRAP_R_OES:
+                return TEXTURE_WRAP_R;
+            case GL_TEXTURE_COMPARE_MODE_EXT:
+                return TEXTURE_COMPARE_MODE;
+            case GL_TEXTURE_COMPARE_FUNC_EXT:
+                return TEXTURE_COMPARE_FUNC;
+            case GL_TEXTURE_MAX_LEVEL_APPLE:
+                return TEXTURE_MAX_LEVEL;
+            default:
+                assert(false && "Unexpected parameter!");
+        }
+
+        return TEXTURE_MIN_FILTER;
+    }
+
+    TextureFloatParameter GLES2StateCacheManager::getTextureFloatParameter(GLenum parameter)
+    {
+        switch (parameter)
+        {
+            case GL_TEXTURE_MAX_ANISOTROPY_EXT:
+                return TEXTURE_MAX_ANISOTROPY;
+            default:
+                assert(false && "Unexpected parameter!");
+        }
+        return TEXTURE_MAX_ANISOTROPY;
+    }
+
     void GLES2StateCacheManager::initializeCache()
     {
         mImp->initializeCache();
@@ -219,5 +297,10 @@ namespace Ogre {
     GLenum GLES2StateCacheManager::getCullFace() const
     {
         return mImp->getCullFace();
+    }
+
+    void GLES2StateCacheManager::setSamplerState(size_t texUnit, const GLES2SamplerState& state)
+    {
+        return mImp->setSamplerState(texUnit, state);
     }
 }

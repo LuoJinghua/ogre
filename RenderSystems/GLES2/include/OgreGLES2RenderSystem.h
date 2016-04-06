@@ -50,7 +50,8 @@ namespace Ogre {
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
     class AndroidResourceManager;
 #endif
-    
+    struct GLES2SamplerState;
+
     /**
       Implementation of GL ES 2.x as a rendering system.
      */
@@ -523,6 +524,11 @@ namespace Ogre {
     private:
             static AndroidResourceManager* mResourceManager;
 #endif
+
+    private:
+            void _commitSamplerState();
+
+            GLES2SamplerState* mSamplerStates;
     };
 }
 

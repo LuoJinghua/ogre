@@ -35,6 +35,8 @@ typedef Ogre::GeneralAllocatedObject StateCacheAlloc;
 
 namespace Ogre
 {
+    struct GLES2SamplerState;
+
     /** An in memory cache of the OpenGL ES state.
      @see GLES2StateCacheManager
      */
@@ -169,6 +171,9 @@ namespace Ogre
         
         /// See GLES2StateCacheManager.setCullFace.
         void setCullFace(GLenum face);
+
+        /// See GLES2StateCacheManager.setSamplerState.
+        void setSamplerState(size_t texUnit, const GLES2SamplerState& state);
     };
 }
 

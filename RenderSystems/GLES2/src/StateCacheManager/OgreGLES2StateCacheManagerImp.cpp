@@ -27,6 +27,7 @@
  */
 
 #include "OgreStableHeaders.h"
+#include "OgreGLES2StateCacheManager.h"
 #include "OgreGLES2StateCacheManagerImp.h"
 #include "OgreGLES2RenderSystem.h"
 #include "OgreLogManager.h"
@@ -200,24 +201,26 @@ namespace Ogre {
         }
         
         // Get a local copy of the parameter map and search for this parameter
-        TexParameteriMap &myMap = (*it).second.mTexParameteriMap;
-        TexParameteriMap::iterator i = myMap.find(pname);
-        
-        if (i == myMap.end())
+        TextureIntegerParameter idx = GLES2StateCacheManager::getTextureIntegerParameter(pname);
+        uint32 bit = 1u << idx;
+        TextureUnitParams& params = (*it).second;
+
+        if (!(params.mValidTexParameteri & bit))
         {
-            // Haven't cached this state yet.  Insert it into the map
-            myMap.insert(TexParameteriMap::value_type(pname, param));
-            
+            // Haven't cached this state yet.
+            params.mTexParameteri[idx] = param;
+            params.mValidTexParameteri |= bit;
+
             // Update GL
             OGRE_CHECK_GL_ERROR(glTexParameteri(target, pname, param));
         }
         else
         {
             // Update the cached value if needed
-            if((*i).second != param)
+            if(params.mTexParameteri[idx] != param)
             {
-                (*i).second = param;
-                
+                params.mTexParameteri[idx] = param;
+
                 // Update GL
                 OGRE_CHECK_GL_ERROR(glTexParameteri(target, pname, param));
             }
@@ -240,13 +243,15 @@ namespace Ogre {
         }
 
         // Get a local copy of the parameter map and search for this parameter
-        TexParameterfMap &myMap = (*it).second.mTexParameterfMap;
-        TexParameterfMap::iterator i = myMap.find(pname);
+        TextureFloatParameter idx = GLES2StateCacheManager::getTextureFloatParameter(pname);
+        uint32 bit = 1u << idx;
+        TextureUnitParams& params = (*it).second;
 
-        if (i == myMap.end())
+        if (!(params.mValidTexParameterf & bit))
         {
-            // Haven't cached this state yet.  Insert it into the map
-            myMap.insert(TexParameterfMap::value_type(pname, param));
+            // Haven't cached this state yet.
+            params.mTexParameterf[idx] = param;
+            params.mValidTexParameteri |= bit;
 
             // Update GL
             OGRE_CHECK_GL_ERROR(glTexParameterf(target, pname, param));
@@ -254,9 +259,9 @@ namespace Ogre {
         else
         {
             // Update the cached value if needed
-            if((*i).second != param)
+            if(params.mTexParameterf[idx] != param)
             {
-                (*i).second = param;
+                params.mTexParameterf[idx] = param;
 
                 // Update GL
                 OGRE_CHECK_GL_ERROR(glTexParameterf(target, pname, param));
@@ -272,9 +277,91 @@ namespace Ogre {
         TexUnitsMap::iterator it = mTexUnitsMap.find(lastBoundTexID);
 
         // Get a local copy of the parameter map and search for this parameter
-        TexParameterfMap::iterator i = (*it).second.mTexParameterfMap.find(pname);
+        TextureFloatParameter idx = GLES2StateCacheManager::getTextureFloatParameter(pname);
+        if (it->second.mValidTexParameterf & (1u << idx))
+            memcpy(params, &(it->second.mTexParameterf[idx]), sizeof(GLfloat));
+    }
 
-        params = &(*i).second;
+    void GLES2StateCacheManagerImp::setSamplerState(size_t texUnit, const GLES2SamplerState& state)
+    {
+        if (!activateGLTextureUnit(texUnit))
+            return;
+
+        GLuint texID = state.getTexture();
+        bindGLTexture(state.getTarget(), texID);
+
+        if (texID == 0)
+            return;
+
+        TexUnitsMap::iterator it = mTexUnitsMap.find(texID);
+
+        if (it == mTexUnitsMap.end())
+        {
+            mTexUnitsMap[texID] = TextureUnitParams();
+            TextureUnitParams& params = mTexUnitsMap[texID];
+
+            for (size_t i = 0; i < TEXTURE_INTEGER_PARAMETER_MAX; i++)
+            {
+                GLenum pname = GLES2StateCacheManager::getGLTextureIntegerParameter(TextureIntegerParameter(i));
+                uint32 bit = 1u << i;
+                if (state.mChangedTexParameteri & bit)
+                {
+                    GLint param = state.mTexParameteri[i];
+                    params.mValidTexParameteri |= bit;
+                    params.mTexParameteri[i] = param;
+                    OGRE_CHECK_GL_ERROR(glTexParameteri(state.mTarget, pname, param));
+                }
+            }
+
+            for (size_t i = 0; i < TEXTURE_FLOAT_PARAMETER_MAX; i++)
+            {
+                GLenum pname = GLES2StateCacheManager::getGLTextureFloatParameter(TextureFloatParameter(i));
+                uint32 bit = 1u << i;
+                if (state.mChangedTexParameterf & bit)
+                {
+                    GLfloat param = state.mTexParameterf[i];
+                    params.mValidTexParameterf |= bit;
+                    params.mTexParameterf[i] = param;
+                    OGRE_CHECK_GL_ERROR(glTexParameterf(state.mTarget, pname, param));
+                }
+            }
+        }
+        else
+        {
+            TextureUnitParams& params = it->second;
+
+            for (size_t i = 0; i < TEXTURE_INTEGER_PARAMETER_MAX; i++)
+            {
+                GLenum pname = GLES2StateCacheManager::getGLTextureIntegerParameter(TextureIntegerParameter(i));
+                uint32 bit = 1u << i;
+                if (state.mChangedTexParameteri & bit)
+                {
+                    GLint param = state.mTexParameteri[i];
+                    if (!(params.mValidTexParameteri & bit) || params.mTexParameteri[i] != param)
+                    {
+                        params.mValidTexParameteri |= bit;
+                        params.mTexParameteri[i] = param;
+                        OGRE_CHECK_GL_ERROR(glTexParameteri(state.mTarget, pname, param));
+                    }
+                }
+            }
+
+            for (size_t i = 0; i < TEXTURE_FLOAT_PARAMETER_MAX; i++)
+            {
+                GLenum pname = GLES2StateCacheManager::getGLTextureFloatParameter(TextureFloatParameter(i));
+                uint32 bit = 1u << i;
+                if (state.mChangedTexParameterf & bit)
+                {
+                    GLfloat param = state.mTexParameterf[i];
+                    if (!(params.mValidTexParameterf & bit) || params.mTexParameterf[i] != param)
+                    {
+                        params.mValidTexParameterf |= bit;
+                        params.mTexParameterf[i] = param;
+                        OGRE_CHECK_GL_ERROR(glTexParameterf(state.mTarget, pname, param));
+                    }
+                }
+            }
+        }
     }
 
     void GLES2StateCacheManagerImp::bindGLTexture(GLenum target, GLuint texture)
@@ -290,10 +377,10 @@ namespace Ogre {
 	{
 		if (mActiveTextureUnit != unit)
 		{
-			if (unit < dynamic_cast<GLES2RenderSystem*>(Root::getSingleton().getRenderSystem())->getCapabilities()->getNumTextureUnits())
+			if (unit < static_cast<GLES2RenderSystem*>(Root::getSingleton().getRenderSystem())->getCapabilities()->getNumTextureUnits())
 			{
-				OGRE_CHECK_GL_ERROR(glActiveTexture(GL_TEXTURE0 + unit));
-				mActiveTextureUnit = unit;
+				OGRE_CHECK_GL_ERROR(glActiveTexture(GL_TEXTURE0 + GLenum(unit)));
+				mActiveTextureUnit = GLenum(unit);
 				return true;
 			}
 			else if (!unit)

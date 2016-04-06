@@ -27,6 +27,7 @@
  */
 
 #include "OgreStableHeaders.h"
+#include "OgreGLES2StateCacheManager.h"
 #include "OgreGLES2NullStateCacheManagerImp.h"
 #include "OgreGLES2RenderSystem.h"
 #include "OgreLogManager.h"
@@ -175,7 +176,37 @@ namespace Ogre {
             return false;
         }
 	}
-    
+
+    void GLES2StateCacheManagerImp::setSamplerState(size_t texUnit, const GLES2SamplerState& state)
+    {
+        activateGLTextureUnit(texUnit);
+        bindGLTexture(state.getTarget(), state.getTexture());
+        if (state.getTexture() == 0)
+            return;
+
+        for (size_t i = 0; i < TEXTURE_INTEGER_PARAMETER_MAX; i++)
+        {
+            GLenum pname = GLES2StateCacheManager::getGLTextureIntegerParameter(TextureIntegerParameter(i));
+            uint32 bit = 1u << i;
+            if (state.mChangedTexParameteri & bit)
+            {
+                GLfloat param = state.mTexParameteri[i];
+                OGRE_CHECK_GL_ERROR(glTexParameteri(state.mTarget, pname, param));
+            }
+        }
+
+        for (size_t i = 0; i < TEXTURE_FLOAT_PARAMETER_MAX; i++)
+        {
+            GLenum pname = GLES2StateCacheManager::getGLTextureFloatParameter(TextureFloatParameter(i));
+            uint32 bit = 1u << i;
+            if (state.mChangedTexParameterf & bit)
+            {
+                GLfloat param = state.mTexParameterf[i];
+                OGRE_CHECK_GL_ERROR(glTexParameterf(state.mTarget, pname, param));
+            }
+        }
+    }
+
     void GLES2StateCacheManagerImp::setBlendFunc(GLenum source, GLenum dest)
     {
         OGRE_CHECK_GL_ERROR(glBlendFunc(source, dest));

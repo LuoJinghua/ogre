@@ -37,6 +37,27 @@ namespace Ogre
 {
 	class GLES2StateCacheManagerImp;
 
+    enum TextureIntegerParameter
+    {
+        TEXTURE_MIN_FILTER = 0,
+        TEXTURE_MAG_FILTER,
+        TEXTURE_WRAP_T,
+        TEXTURE_WRAP_S,
+        TEXTURE_WRAP_R,
+        TEXTURE_COMPARE_MODE,
+        TEXTURE_COMPARE_FUNC,
+        TEXTURE_MAX_LEVEL,
+        TEXTURE_INTEGER_PARAMETER_MAX,
+    };
+    
+    enum TextureFloatParameter
+    {
+        TEXTURE_MAX_ANISOTROPY = 0,
+        TEXTURE_FLOAT_PARAMETER_MAX,
+    };
+
+    struct GLES2SamplerState;
+
     /** An in memory cache of the OpenGL ES state.
      @remarks
      State changes can be particularly expensive time wise. This is because
@@ -58,6 +79,11 @@ namespace Ogre
     public:
         GLES2StateCacheManager(void);
         ~GLES2StateCacheManager(void);
+
+        static GLenum getGLTextureIntegerParameter(TextureIntegerParameter parameter);
+        static GLenum getGLTextureFloatParameter(TextureFloatParameter parameter);
+        static TextureIntegerParameter getTextureIntegerParameter(GLenum parameter);
+        static TextureFloatParameter getTextureFloatParameter(GLenum parameter);
 
 		/** Initialize our cache variables and sets the
             GL states on the current context.
@@ -246,6 +272,121 @@ namespace Ogre
          @param face The face culling mode to use.
          */
         void setCullFace(GLenum face);
+
+        /** Sets the sampler settings.
+         @param texUnit The texture unit to apply.
+         @param state The sampler states to use.
+         */
+        void setSamplerState(size_t texUnit, const GLES2SamplerState& state);
+
+        
+    };
+
+    struct _OgreGLES2Export GLES2SamplerState : public StateCacheAlloc
+    {
+        GLES2SamplerState()
+        {
+            mTarget = 0;
+            mTexture = 0;
+            mDirty = false;
+            mChangedTexParameteri = 0;
+            mChangedTexParameterf = 0;
+            memset(mTexParameteri, 0, sizeof(mTexParameteri));
+            memset(mTexParameterf, 0, sizeof(mTexParameterf));
+        }
+
+        ~GLES2SamplerState()
+        {
+        }
+
+        void clear()
+        {
+            memset(mTexParameteri, 0, sizeof(mTexParameteri));
+            memset(mTexParameterf, 0, sizeof(mTexParameterf));
+            mChangedTexParameteri = 0;
+            mChangedTexParameterf = 0;
+            mDirty = false;
+        }
+
+        void setTarget(GLenum target)
+        {
+            mTarget = target;
+        }
+
+        GLenum getTarget() const { return mTarget; }
+
+        void setTexture(GLuint texture)
+        {
+            mTexture = texture;
+            mDirty = true;
+        }
+
+        GLuint getTexture() const { return mTexture; }
+
+        void setTexParameteri(GLenum what, GLint value)
+        {
+            size_t idx = GLES2StateCacheManager::getTextureIntegerParameter(what);
+            mTexParameteri[idx] = value;
+            mChangedTexParameteri |= 1u << idx;
+        }
+
+        void setTexParameterf(GLenum what, GLfloat value)
+        {
+            size_t idx = GLES2StateCacheManager::getTextureFloatParameter(what);
+            mTexParameterf[idx] = value;
+            mChangedTexParameterf |= 1u << idx;
+        }
+
+        bool hasTexParameteri(GLenum what) const
+        {
+            size_t idx = GLES2StateCacheManager::getTextureIntegerParameter(what);
+            if (mChangedTexParameteri & 1u << idx)
+                return true;
+            return false;
+        }
+
+        bool hasTexParameterf(GLenum what) const
+        {
+            size_t idx = GLES2StateCacheManager::getTextureFloatParameter(what);
+            if (mChangedTexParameterf & 1u << idx)
+                return true;
+            return false;
+        }
+
+        GLint getTexParameteri(GLenum what) const
+        {
+            size_t idx = GLES2StateCacheManager::getTextureIntegerParameter(what);
+            return mTexParameteri[idx];
+        }
+
+        GLfloat getTexParameterf(GLenum what) const
+        {
+            size_t idx = GLES2StateCacheManager::getTextureFloatParameter(what);
+            return mTexParameterf[idx];
+        }
+
+        uint32 getChangedTexParameteri() const
+        {
+            return mChangedTexParameteri;
+        }
+
+        uint32 getChangedTexParameterf() const
+        {
+            return mChangedTexParameterf;
+        }
+
+        bool isDirty() const
+        {
+            return mDirty || mChangedTexParameteri || mChangedTexParameterf;
+        }
+
+        GLenum mTarget;
+        GLuint mTexture;
+        bool mDirty;
+        uint32 mChangedTexParameteri;
+        GLint mTexParameteri[TEXTURE_INTEGER_PARAMETER_MAX];
+        uint32 mChangedTexParameterf;
+        GLfloat mTexParameterf[TEXTURE_FLOAT_PARAMETER_MAX];
     };
 }
 

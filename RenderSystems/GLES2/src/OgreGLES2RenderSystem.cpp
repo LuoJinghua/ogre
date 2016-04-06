@@ -116,6 +116,7 @@ namespace Ogre {
         mMipFilter = FO_POINT;
         mCurrentVertexProgram = 0;
         mCurrentFragmentProgram = 0;
+        mSamplerStates = OGRE_NEW_ARRAY_T(GLES2SamplerState, OGRE_MAX_TEXTURE_LAYERS, MEMCATEGORY_GENERAL);
     }
 
     GLES2RenderSystem::~GLES2RenderSystem()
@@ -135,6 +136,9 @@ namespace Ogre {
 
         OGRE_DELETE mStateCacheManager;
         mStateCacheManager = 0;
+
+        OGRE_DELETE_ARRAY_T(mSamplerStates, GLES2SamplerState, OGRE_MAX_TEXTURE_LAYERS, MEMCATEGORY_GENERAL);
+        mSamplerStates = 0;
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
         if (mResourceManager != NULL)
@@ -815,8 +819,10 @@ namespace Ogre {
     {
 		GLES2TexturePtr tex = texPtr.staticCast<GLES2Texture>();
 
-		if (!mStateCacheManager->activateGLTextureUnit(stage))
-			return;
+		GLES2SamplerState& samplerState = mSamplerStates[stage];
+		if (samplerState.isDirty())
+			mStateCacheManager->setSamplerState(stage, samplerState);
+		samplerState.clear();
 
 		if (enabled)
 		{
@@ -841,15 +847,15 @@ namespace Ogre {
 				texID = static_cast<GLES2TextureManager*>(mTextureManager)->getWarningTextureID();
 			}
 
-            mStateCacheManager->bindGLTexture(mTextureTypes[stage], texID);
+			samplerState.setTarget(mTextureTypes[stage]);
+			samplerState.setTexture(texID);
 		}
 		else
 		{
+			samplerState.setTarget(GL_TEXTURE_2D);
 			// Bind zero texture
-			mStateCacheManager->bindGLTexture(GL_TEXTURE_2D, 0);
+			samplerState.setTexture(0);
 		}
-
-		mStateCacheManager->activateGLTextureUnit(0);
     }
 
     void GLES2RenderSystem::_setTextureCoordSet(size_t stage, size_t index)
@@ -874,15 +880,11 @@ namespace Ogre {
 
     void GLES2RenderSystem::_setTextureAddressingMode(size_t stage, const TextureUnitState::UVWAddressingMode& uvw)
     {
-		if (!mStateCacheManager->activateGLTextureUnit(stage))
-			return;
-
-		mStateCacheManager->setTexParameteri(mTextureTypes[stage], GL_TEXTURE_WRAP_S, getTextureAddressingMode(uvw.u));
-		mStateCacheManager->setTexParameteri(mTextureTypes[stage], GL_TEXTURE_WRAP_T, getTextureAddressingMode(uvw.v));
+        mSamplerStates[stage].setTexParameteri(GL_TEXTURE_WRAP_S, getTextureAddressingMode(uvw.u));
+        mSamplerStates[stage].setTexParameteri(GL_TEXTURE_WRAP_T, getTextureAddressingMode(uvw.v));
 #if OGRE_NO_GLES3_SUPPORT == 0
-		mStateCacheManager->setTexParameteri(mTextureTypes[stage], GL_TEXTURE_WRAP_R, getTextureAddressingMode(uvw.w));
+        mSamplerStates[stage].setTexParameteri(GL_TEXTURE_WRAP_R, getTextureAddressingMode(uvw.w));
 #endif
-		mStateCacheManager->activateGLTextureUnit(0);
     }
 
     GLenum GLES2RenderSystem::getBlendMode(SceneBlendFactor ogreBlend) const
@@ -1123,6 +1125,9 @@ namespace Ogre {
 
     void GLES2RenderSystem::_endFrame(void)
     {
+        _disableTextureUnitsFrom(0);
+        _commitSamplerState();
+
         // Deactivate the viewport clipping.
         mStateCacheManager->setDisabled(GL_SCISSOR_TEST);
 
@@ -1537,66 +1542,60 @@ namespace Ogre {
 				
     void GLES2RenderSystem::_setTextureUnitFiltering(size_t unit, FilterType ftype, FilterOptions fo)
     {
-		if (!mStateCacheManager->activateGLTextureUnit(unit))
-			return;
-
-        // This is a bit of a hack that will need to fleshed out later.
-        // On iOS cube maps are especially sensitive to texture parameter changes.
-        // So, for performance (and it's a large difference) we will skip updating them.
         if(mTextureTypes[unit] == GL_TEXTURE_CUBE_MAP)
-        {
-            mStateCacheManager->activateGLTextureUnit(0);
             return;
-        }
 
         switch (ftype)
         {
             case FT_MIN:
                 mMinFilter = fo;
-				// Combine with existing mip filter
-				mStateCacheManager->setTexParameteri(mTextureTypes[unit],
-								GL_TEXTURE_MIN_FILTER,
-								getCombinedMinMipFilter());
-				break;
+                // Combine with existing mip filter
+                mSamplerStates[unit].setTexParameteri(GL_TEXTURE_MIN_FILTER,
+                                                      getCombinedMinMipFilter());
+                break;
             case FT_MAG:
                 switch (fo)
-                {
-                    case FO_ANISOTROPIC: // GL treats linear and aniso the same
-                    case FO_LINEAR:
-                        mStateCacheManager->setTexParameteri(mTextureTypes[unit],
-                                        GL_TEXTURE_MAG_FILTER,
-                                        GL_LINEAR);
-                        break;
-                    case FO_POINT:
-                    case FO_NONE:
-                        mStateCacheManager->setTexParameteri(mTextureTypes[unit],
-                                        GL_TEXTURE_MAG_FILTER,
-                                        GL_NEAREST);
-                        break;
-                }
+            {
+                case FO_ANISOTROPIC: // GL treats linear and aniso the same
+                case FO_LINEAR:
+                    mSamplerStates[unit].setTexParameteri(GL_TEXTURE_MAG_FILTER,
+                                                          GL_LINEAR);
+                    break;
+                case FO_POINT:
+                case FO_NONE:
+                    mSamplerStates[unit].setTexParameteri(GL_TEXTURE_MAG_FILTER,
+                                                          GL_NEAREST);
+                    break;
+            }
                 break;
             case FT_MIP:
                 mMipFilter = fo;
-
                 // Combine with existing min filter
-                mStateCacheManager->setTexParameteri(mTextureTypes[unit],
-                                                     GL_TEXTURE_MIN_FILTER,
-                                                     getCombinedMinMipFilter());
+                mSamplerStates[unit].setTexParameteri(GL_TEXTURE_MIN_FILTER,
+                                                      getCombinedMinMipFilter());
                 
                 break;
         }
-
-		mStateCacheManager->activateGLTextureUnit(0);
     }
 
     GLfloat GLES2RenderSystem::_getCurrentAnisotropy(size_t unit)
 	{
 		GLfloat curAniso = 0;
         const RenderSystemCapabilities* caps = getCapabilities();
-        if (caps->hasCapability(RSC_ANISOTROPY))
+        if (!caps->hasCapability(RSC_ANISOTROPY))
+            return 1;
+
+        if (mSamplerStates[unit].hasTexParameterf(GL_TEXTURE_MAX_ANISOTROPY_EXT))
+        {
+            curAniso = mSamplerStates[unit].getTexParameterf(GL_TEXTURE_MAX_ANISOTROPY_EXT);
+        }
+        else
+        {
+            mStateCacheManager->setSamplerState(unit, mSamplerStates[unit]);
+            mSamplerStates[unit].clear();
             OGRE_CHECK_GL_ERROR(glGetTexParameterfv(mTextureTypes[unit],
                                                     GL_TEXTURE_MAX_ANISOTROPY_EXT, &curAniso));
-
+        }
 		return curAniso ? curAniso : 1;
 	}
     
@@ -1605,24 +1604,33 @@ namespace Ogre {
 		if (!mCurrentCapabilities->hasCapability(RSC_ANISOTROPY))
 			return;
 
-		if (!mStateCacheManager->activateGLTextureUnit(unit))
-			return;
-        const RenderSystemCapabilities* caps = getCapabilities();
-        if (caps->hasCapability(RSC_ANISOTROPY))
+        if (maxAnisotropy > mCurrentCapabilities->getMaxSupportedAnisotropy())
+            maxAnisotropy = mCurrentCapabilities->getMaxSupportedAnisotropy() ?
+            static_cast<uint>(mCurrentCapabilities->getMaxSupportedAnisotropy()) : 1;
+
+        mSamplerStates[unit].setTexParameterf(GL_TEXTURE_MAX_ANISOTROPY_EXT, (float)maxAnisotropy);
+    }
+
+    void GLES2RenderSystem::_commitSamplerState()
+    {
+        bool dirty = false;
+        for (int i = OGRE_MAX_TEXTURE_LAYERS - 1; i >= 0; i--)
         {
-            if (maxAnisotropy > mCurrentCapabilities->getMaxSupportedAnisotropy())
-                maxAnisotropy = mCurrentCapabilities->getMaxSupportedAnisotropy() ? 
-                static_cast<uint>(mCurrentCapabilities->getMaxSupportedAnisotropy()) : 1;
-
-            mStateCacheManager->setTexParameterf(mTextureTypes[unit],
-                                                  GL_TEXTURE_MAX_ANISOTROPY_EXT, (float)maxAnisotropy);
+            if (mSamplerStates[i].isDirty())
+            {
+                mStateCacheManager->setSamplerState(i, mSamplerStates[i]);
+                mSamplerStates[i].clear();
+                dirty = true;
+            }
         }
-
-		mStateCacheManager->activateGLTextureUnit(0);
+        if (dirty)
+            mStateCacheManager->activateGLTextureUnit(0);
     }
 
     void GLES2RenderSystem::_render(const RenderOperation& op)
     {
+        _commitSamplerState();
+
         // Call super class
         RenderSystem::_render(op);
 
