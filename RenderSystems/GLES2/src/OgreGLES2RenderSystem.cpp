@@ -974,7 +974,7 @@ namespace Ogre {
         else
         {
             mStateCacheManager->setEnabled(GL_BLEND);
-            OGRE_CHECK_GL_ERROR(glBlendFuncSeparate(sourceBlend, destBlend, sourceBlendAlpha, destBlendAlpha));
+            OGRE_CHECK_GL_ERROR(mStateCacheManager->setBlendFuncSeparate(sourceBlend, destBlend, sourceBlendAlpha, destBlendAlpha));
         }
         
         GLint func = GL_FUNC_ADD, alphaFunc = GL_FUNC_ADD;
@@ -1021,7 +1021,7 @@ namespace Ogre {
                 break;
         }
         
-        OGRE_CHECK_GL_ERROR(glBlendEquationSeparate(func, alphaFunc));
+        OGRE_CHECK_GL_ERROR(mStateCacheManager->setBlendEquationSeparate(func, alphaFunc));
 	}
 
     void GLES2RenderSystem::_setAlphaRejectSettings(CompareFunction func, unsigned char value, bool alphaToCoverage)

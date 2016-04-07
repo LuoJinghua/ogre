@@ -184,9 +184,20 @@ namespace Ogre {
         mImp->setBlendFunc(source, dest);
     }
     
+    void GLES2StateCacheManager::setBlendFuncSeparate(GLenum source, GLenum dest,
+                                                      GLenum sourceAlpha, GLenum destAlpha)
+    {
+        mImp->setBlendFuncSeparate(source, dest, sourceAlpha, destAlpha);
+    }
+    
     void GLES2StateCacheManager::setBlendEquation(GLenum eq)
     {
         mImp->setBlendEquation(eq);
+    }
+    
+    void GLES2StateCacheManager::setBlendEquationSeparate(GLenum eq, GLenum eqAlpha)
+    {
+        mImp->setBlendEquationSeparate(eq, eqAlpha);
     }
     
     void GLES2StateCacheManager::setDepthMask(GLboolean mask)

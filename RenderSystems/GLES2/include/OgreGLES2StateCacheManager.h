@@ -156,11 +156,26 @@ namespace Ogre
          */
         void setBlendEquation(GLenum eq);
 
+        /** Sets the current separate blend equation setting.
+         @param eq The blend equation to use.
+         @param alphaEq The alpha blend equation to use.
+         */
+        void setBlendEquationSeparate(GLenum eq, GLenum alphaEq);
+
         /** Sets the blending function.
          @param source The blend mode for the source.
          @param dest The blend mode for the destination
          */
         void setBlendFunc(GLenum source, GLenum dest);
+
+        /** Sets the separate blending function.
+         @param source The blend mode for the source.
+         @param dest The blend mode for the destination
+         @param alphaSource The blend mode for the source alpha.
+         @param alphaDest The blend mode for the destination alpha
+         */
+        void setBlendFuncSeparate(GLenum source, GLenum dest,
+                                  GLenum alphaSource, GLenum alphaDest);
 
         /** Gets the current depth mask setting.
          @return The current depth mask.

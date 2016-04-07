@@ -78,6 +78,7 @@ namespace Ogre {
         mDepthMask = GL_TRUE;
         mPolygonMode = GL_FILL;
         mBlendEquation = GL_FUNC_ADD;
+        mAlphaBlendEquation = GL_FUNC_ADD;
         mCullFace = GL_BACK;
         mDepthFunc = GL_LESS;
         mStencilMask = 0xFFFFFFFF;
@@ -90,7 +91,9 @@ namespace Ogre {
         // stored values match the GL state
         mBlendFuncSource = GL_ONE;
         mBlendFuncDest = GL_ZERO;
-        
+        mAlphaBlendFuncSource = GL_ONE;
+        mAlphaBlendFuncDest = GL_ZERO;
+
         mClearColour.resize(4);
         mClearColour[0] = mClearColour[1] = mClearColour[2] = mClearColour[3] = 0.0f;
         
@@ -402,25 +405,55 @@ namespace Ogre {
     // TODO: Store as high/low bits of a GLuint
     void GLES2StateCacheManagerImp::setBlendFunc(GLenum source, GLenum dest)
     {
-        if(mBlendFuncSource != source || mBlendFuncDest != dest)
+        if(mBlendFuncSource != source || mBlendFuncDest != dest ||
+           mAlphaBlendFuncSource != source || mAlphaBlendFuncDest != dest)
         {
             mBlendFuncSource = source;
             mBlendFuncDest = dest;
-            
+            mAlphaBlendFuncSource = source;
+            mAlphaBlendFuncDest = dest;
+
             OGRE_CHECK_GL_ERROR(glBlendFunc(source, dest));
         }
     }
-    
+
+    void GLES2StateCacheManagerImp::setBlendFuncSeparate(GLenum source, GLenum dest,
+                                                         GLenum alphaSource, GLenum alphaDest)
+    {
+        if(mBlendFuncSource != source || mBlendFuncDest != dest ||
+           mAlphaBlendFuncSource != alphaSource || mAlphaBlendFuncDest != alphaDest)
+        {
+            mBlendFuncSource = source;
+            mBlendFuncDest = dest;
+            mAlphaBlendFuncSource = alphaSource;
+            mAlphaBlendFuncDest = alphaDest;
+            
+            OGRE_CHECK_GL_ERROR(glBlendFuncSeparate(source, dest, alphaSource, alphaDest));
+        }
+    }
+
     void GLES2StateCacheManagerImp::setBlendEquation(GLenum eq)
     {
-        if(mBlendEquation != eq)
+        if(mBlendEquation != eq || mAlphaBlendEquation != eq)
         {
             mBlendEquation = eq;
+            mAlphaBlendEquation = eq;
             
             OGRE_CHECK_GL_ERROR(glBlendEquation(eq));
         }
     }
-    
+
+    void GLES2StateCacheManagerImp::setBlendEquationSeparate(GLenum eq, GLenum alphaEq)
+    {
+        if(mBlendEquation != eq || mAlphaBlendEquation != alphaEq)
+        {
+            mBlendEquation = eq;
+            mAlphaBlendEquation = alphaEq;
+
+            OGRE_CHECK_GL_ERROR(glBlendEquationSeparate(eq, alphaEq));
+        }
+    }
+
     void GLES2StateCacheManagerImp::setDepthMask(GLboolean mask)
     {
         if(mDepthMask != mask)

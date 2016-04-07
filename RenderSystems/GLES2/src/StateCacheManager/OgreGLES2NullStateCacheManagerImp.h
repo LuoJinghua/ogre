@@ -106,8 +106,15 @@ namespace Ogre
         /// See GLES2StateCacheManager.setBlendEquation.
         void setBlendEquation(GLenum eq);
         
+        /// See GLES2StateCacheManager.setBlendEquation.
+        void setBlendEquationSeparate(GLenum eq, GLenum alphaEq);
+        
         /// See GLES2StateCacheManager.setBlendFunc.
         void setBlendFunc(GLenum source, GLenum dest);
+        
+        /// See GLES2StateCacheManager.setBlendFunc.
+        void setBlendFuncSeparate(GLenum source, GLenum dest,
+                                  GLenum alphaSource, GLenum alphaDest);
         
         /// See GLES2StateCacheManager.getDepthMask.
         GLboolean getDepthMask(void) const { return mDepthMask; }

@@ -212,10 +212,22 @@ namespace Ogre {
         OGRE_CHECK_GL_ERROR(glBlendFunc(source, dest));
     }
     
+    void GLES2StateCacheManagerImp::setBlendFuncSeparate(GLenum source, GLenum dest,
+                                                         GLenum alphaSource, GLenum alphaDest)
+    {
+        OGRE_CHECK_GL_ERROR(glBlendFuncSeparate(source, dest, alphaSource, alphaDest));
+    }
+    
     void GLES2StateCacheManagerImp::setBlendEquation(GLenum eq)
     {
         mBlendEquation = eq;
         OGRE_CHECK_GL_ERROR(glBlendEquation(eq));
+    }
+    
+    void GLES2StateCacheManagerImp::setBlendEquationSeparate(GLenum eq, GLenum alphaEq)
+    {
+        mBlendEquation = eq;
+        OGRE_CHECK_GL_ERROR(glBlendEquationSeparate(eq, alphaEq));
     }
     
     void GLES2StateCacheManagerImp::setDepthMask(GLboolean mask)
