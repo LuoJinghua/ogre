@@ -2384,8 +2384,6 @@ namespace Ogre {
         // FIXME: Having this commented out fixes some rendering issues but leaves VAO's useless
         if (updateVAO)
         {
-			mStateCacheManager->bindGLBuffer(GL_ARRAY_BUFFER,
-                                             hwGlBuffer->getGLBufferId());
             pBufferData = VBO_BUFFER_OFFSET(elem.getOffset());
 
             if (vertexStart)
@@ -2420,6 +2418,9 @@ namespace Ogre {
 
                 attrib = (GLuint)linkProgram->getAttributeIndex(sem, elemIndex);
             }
+
+            mStateCacheManager->bindGLBuffer(GL_ARRAY_BUFFER,
+                                             hwGlBuffer->getGLBufferId());
 
             const RenderSystemCapabilities* caps = getCapabilities();
             if(caps->hasCapability(RSC_VERTEX_BUFFER_INSTANCE_DATA))
