@@ -689,8 +689,12 @@ static void load_procs(void)
 	gleswGetQueryObjectuivEXT = (PFNGLGETQUERYOBJECTUIVEXTPROC) get_proc("glGetQueryObjectuivEXT");
 	gleswGetQueryObjecti64vEXT = (PFNGLGETQUERYOBJECTI64VEXTPROC) get_proc("glGetQueryObjecti64vEXT");
 	gleswGetQueryObjectui64vEXT = (PFNGLGETQUERYOBJECTUI64VEXTPROC) get_proc("glGetQueryObjectui64vEXT");
-	gleswMapBufferRangeEXT = (PFNGLMAPBUFFERRANGEEXTPROC) get_proc("glMapBufferRangeEXT");
-	gleswFlushMappedBufferRangeEXT = (PFNGLFLUSHMAPPEDBUFFERRANGEEXTPROC) get_proc("glFlushMappedBufferRangeEXT");
+	gleswMapBufferRangeEXT = (PFNGLMAPBUFFERRANGEEXTPROC) get_proc("glMapBufferRange");
+	if (!gleswMapBufferRangeEXT)
+		gleswMapBufferRangeEXT = (PFNGLMAPBUFFERRANGEEXTPROC) get_proc("glMapBufferRangeEXT");
+	gleswFlushMappedBufferRangeEXT = (PFNGLFLUSHMAPPEDBUFFERRANGEEXTPROC) get_proc("glFlushMappedBufferRange");
+	if (!gleswFlushMappedBufferRangeEXT)
+		gleswFlushMappedBufferRangeEXT = (PFNGLFLUSHMAPPEDBUFFERRANGEEXTPROC) get_proc("glFlushMappedBufferRangeEXT");
 	gleswRenderbufferStorageMultisampleEXT = (PFNGLRENDERBUFFERSTORAGEMULTISAMPLEEXTPROC) get_proc("glRenderbufferStorageMultisampleEXT");
 	gleswFramebufferTexture2DMultisampleEXT = (PFNGLFRAMEBUFFERTEXTURE2DMULTISAMPLEEXTPROC) get_proc("glFramebufferTexture2DMultisampleEXT");
 	gleswReadBufferIndexedEXT = (PFNGLREADBUFFERINDEXEDEXTPROC) get_proc("glReadBufferIndexedEXT");
