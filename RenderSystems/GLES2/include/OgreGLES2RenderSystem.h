@@ -51,6 +51,7 @@ namespace Ogre {
     class AndroidResourceManager;
 #endif
     struct GLES2SamplerState;
+    class GLES2VertexArrayObjectBinding;
 
     /**
       Implementation of GL ES 2.x as a rendering system.
@@ -129,7 +130,8 @@ namespace Ogre {
                                         const size_t vertexStart,
                                         vector<GLuint>::type &attribsBound,
                                         vector<GLuint>::type &instanceAttribsBound,
-                                        bool updateVAO);
+                                        bool updateVAO,
+                                        GLES2VertexArrayObjectBinding* binding);
 
 			// Mipmap count of the actual bounded texture
 			size_t mCurTexMipCount;

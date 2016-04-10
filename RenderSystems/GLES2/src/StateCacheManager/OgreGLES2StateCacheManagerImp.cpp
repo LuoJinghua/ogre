@@ -105,6 +105,7 @@ namespace Ogre {
         mActiveBufferMap.clear();
         mTexUnitsMap.clear();
 
+        mActiveVertexArray = 0;
         mEnabledVertexAttribs.clear();
 
         mActiveTexture.clear();
@@ -548,13 +549,40 @@ namespace Ogre {
         }
     }
 
+    void GLES2StateCacheManagerImp::bindVertexArray(GLuint vao)
+    {
+        if (!glBindVertexArrayOES)
+            return;
+
+        if (mActiveVertexArray == vao)
+            return;
+
+        mActiveBufferMap.erase(GL_ELEMENT_ARRAY_BUFFER);
+        mActiveVertexArray = vao;
+        OGRE_CHECK_GL_ERROR(glBindVertexArrayOES(vao));
+    }
+
+    void GLES2StateCacheManagerImp::deleteVertexArray(GLuint vao)
+    {
+        if (!glDeleteVertexArraysOES)
+            return;
+
+        mEnabledVertexAttribs.erase(vao);
+        OGRE_CHECK_GL_ERROR(glDeleteVertexArraysOES(1, &vao));
+    }
+
+    GLuint GLES2StateCacheManagerImp::getActiveVertexArray()
+    {
+        return mActiveVertexArray;
+    }
+
     void GLES2StateCacheManagerImp::setVertexAttribEnabled(GLuint attrib)
     {
-        typedef map<GLuint, bool>::type VertexAttribList;
-        VertexAttribList::iterator iter = mEnabledVertexAttribs.find(attrib);
-        if(iter == mEnabledVertexAttribs.end())
+        VertexAttribMap& attribs = mEnabledVertexAttribs[mActiveVertexArray];
+        VertexAttribMap::iterator iter = attribs.find(attrib);
+        if(iter == attribs.end())
         {
-            mEnabledVertexAttribs.insert(VertexAttribList::value_type(attrib, true));
+            attribs.insert(VertexAttribMap::value_type(attrib, true));
 
             OGRE_CHECK_GL_ERROR(glEnableVertexAttribArray(attrib));
         }
@@ -568,8 +596,9 @@ namespace Ogre {
 
     void GLES2StateCacheManagerImp::setVertexAttribDisabled(GLuint attrib)
     {
-        map<GLuint, bool>::iterator iter = mEnabledVertexAttribs.find(attrib);
-        if(iter != mEnabledVertexAttribs.end() && iter->second)
+        VertexAttribMap& attribs = mEnabledVertexAttribs[mActiveVertexArray];
+        VertexAttribMap::iterator iter = attribs.find(attrib);
+        if(iter != attribs.end() && iter->second)
         {
             iter->second = false;
 

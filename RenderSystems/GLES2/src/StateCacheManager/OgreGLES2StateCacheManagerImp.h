@@ -48,6 +48,7 @@ namespace Ogre
         typedef map<GLenum, GLuint>::type BindBufferMap;
         typedef map<GLenum, GLint>::type TexParameteriMap;
         typedef map<GLenum, GLfloat>::type TexParameterfMap;
+        typedef map<GLuint, bool>::type VertexAttribMap;
 
         struct TextureUnitParams
         {
@@ -83,8 +84,10 @@ namespace Ogre
         vector<GLclampf>::type mClearColour;
         /// Stores the current colour write mask
         vector<GLboolean>::type mColourMask;
+        /// Stores the currently active vertex array
+        GLuint mActiveVertexArray;
         /// Stores the currently enabled vertex attributes
-        map<GLuint, bool>::type mEnabledVertexAttribs;
+        map<GLuint, VertexAttribMap>::type mEnabledVertexAttribs;
         /// Stores the current depth write mask
         GLboolean mDepthMask;
         /// Stores the current polygon rendering mode
@@ -205,6 +208,15 @@ namespace Ogre
         /// See GLES2StateCacheManager.setDisabled.
         void setDisabled(GLenum flag);
 
+        /// See GLES2StateCacheManager.bindVertexArray.
+        void bindVertexArray(GLuint vao);
+        
+        /// See GLES2StateCacheManager.deleteVertexArray.
+        void deleteVertexArray(GLuint vao);
+        
+        /// See GLES2StateCacheManager.getActiveVertexArray.
+        GLuint getActiveVertexArray();
+        
         /// See GLES2StateCacheManager.setVertexAttribEnabled.
         void setVertexAttribEnabled(GLuint attrib);
 

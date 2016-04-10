@@ -48,6 +48,7 @@ THE SOFTWARE.
 #include "OgreGLSLESProgramPipelineManager.h"
 #include "OgreGLSLESProgramPipeline.h"
 #include "OgreGLES2StateCacheManager.h"
+#include "OgreGLES2VertexDeclaration.h"
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
 #   include "OgreEAGL2Window.h"
@@ -1664,9 +1665,16 @@ namespace Ogre {
         GLES2VertexDeclaration* gles2decl = 
             static_cast<GLES2VertexDeclaration*>(op.vertexData->vertexDeclaration);
 
+        GLES2VertexArrayObjectBinding* binding = 0;
+
         // Use a little shorthand
 #if OGRE_NO_GLES2_VAO_SUPPORT == 0
-        bool useVAO = (gles2decl && gles2decl->isInitialised()) && caps->hasCapability(RSC_VAO);
+        bool useVAO = gles2decl && caps->hasCapability(RSC_VAO);
+        if (gles2decl)
+        {
+            binding = &gles2decl->getBinding();
+            gles2decl->_load();
+        }
 #else
         bool useVAO = false;
 #endif
@@ -1685,7 +1693,8 @@ namespace Ogre {
             HardwareVertexBufferSharedPtr vertexBuffer =
                 op.vertexData->vertexBufferBinding->getBuffer(elemSource);
             bindVertexElementToGpu(elem, vertexBuffer, op.vertexData->vertexStart,
-                                   mRenderAttribsBound, mRenderInstanceAttribsBound, true);
+                                   mRenderAttribsBound, mRenderInstanceAttribsBound, true,
+                                   binding);
         }
 
         if(caps->hasCapability(RSC_VERTEX_BUFFER_INSTANCE_DATA))
@@ -1697,7 +1706,7 @@ namespace Ogre {
                 {
                     const VertexElement & elem = *elemIter;
                     bindVertexElementToGpu(elem, globalInstanceVertexBuffer, 0,
-                                           mRenderAttribsBound, mRenderInstanceAttribsBound, true);
+                                           mRenderAttribsBound, mRenderInstanceAttribsBound, true, binding);
                     continue;
                 }
             }
@@ -1732,9 +1741,13 @@ namespace Ogre {
         if (op.useIndexes)
         {
             // If we are using VAO's then only bind the buffer the first time through. Otherwise, always bind.
-            if (!useVAO || (useVAO && gles2decl && !gles2decl->isInitialised()))
-                mStateCacheManager->bindGLBuffer(GL_ELEMENT_ARRAY_BUFFER,
-                         static_cast<GLES2HardwareIndexBuffer*>(op.indexData->indexBuffer.get())->getGLBufferId());
+            GLuint indexBufferId = static_cast<GLES2HardwareIndexBuffer*>(op.indexData->indexBuffer.get())->getGLBufferId();
+            if (!binding || binding->getElementBufferId() != indexBufferId)
+            {
+                mStateCacheManager->bindGLBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBufferId);
+                if (binding)
+                    binding->setElementBufferId(indexBufferId);
+            }
 
             pBufferData = VBO_BUFFER_OFFSET(op.indexData->indexStart *
                                             op.indexData->indexBuffer->getIndexSize());
@@ -1790,29 +1803,26 @@ namespace Ogre {
             } while (updatePassIterationRenderState());
         }
 
-        if (useVAO && gles2decl && !gles2decl->isInitialised())
-        {
-            gles2decl->setInitialised(true);
-        }
-
 #if OGRE_NO_GLES2_VAO_SUPPORT == 0
-        if(caps->hasCapability(RSC_VAO))
-            // Unbind the vertex array object.  Marks the end of what state will be included.
-            OGRE_CHECK_GL_ERROR(glBindVertexArrayOES(0));
+        // Unbind the vertex array object.  Marks the end of what state will be included.
+        if(useVAO)
+            mStateCacheManager->bindVertexArray(0);
 #endif
 
-        // Unbind all attributes
-		for (vector<GLuint>::type::iterator ai = mRenderAttribsBound.begin(); ai != mRenderAttribsBound.end(); ++ai)
- 		{
-            mStateCacheManager->setVertexAttribDisabled(*ai);
-// 			OGRE_CHECK_GL_ERROR(glDisableVertexAttribArray(*ai));
-  		}
+        if (!useVAO)
+        {
+            // Unbind all attributes
+            for (vector<GLuint>::type::iterator ai = mRenderAttribsBound.begin(); ai != mRenderAttribsBound.end(); ++ai)
+            {
+                mStateCacheManager->setVertexAttribDisabled(*ai);
+            }
 
-        // Unbind any instance attributes
-		for (vector<GLuint>::type::iterator ai = mRenderInstanceAttribsBound.begin(); ai != mRenderInstanceAttribsBound.end(); ++ai)
-		{
-			OGRE_CHECK_GL_ERROR(glVertexAttribDivisorEXT(*ai, 0));
-		}
+            // Unbind any instance attributes
+            for (vector<GLuint>::type::iterator ai = mRenderInstanceAttribsBound.begin(); ai != mRenderInstanceAttribsBound.end(); ++ai)
+            {
+                OGRE_CHECK_GL_ERROR(glVertexAttribDivisorEXT(*ai, 0));
+            }
+        }
 
         mRenderAttribsBound.clear();
         mRenderInstanceAttribsBound.clear();
@@ -2376,7 +2386,8 @@ namespace Ogre {
                                                      HardwareVertexBufferSharedPtr vertexBuffer, const size_t vertexStart,
                                                      vector<GLuint>::type &attribsBound,
                                                      vector<GLuint>::type &instanceAttribsBound,
-                                                     bool updateVAO)
+                                                     bool updateVAO,
+                                                     GLES2VertexArrayObjectBinding* binding)
     {
         void* pBufferData = 0;
         const GLES2HardwareVertexBuffer* hwGlBuffer = static_cast<const GLES2HardwareVertexBuffer*>(vertexBuffer.get());
@@ -2397,7 +2408,7 @@ namespace Ogre {
             GLuint attrib = 0;
             unsigned short elemIndex = elem.getIndex();
 
-            if(Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_SEPARATE_SHADER_OBJECTS))
+            if(getCapabilities()->hasCapability(RSC_SEPARATE_SHADER_OBJECTS))
             {
                 GLSLESProgramPipeline* programPipeline =
                 GLSLESProgramPipelineManager::getSingleton().getActiveProgramPipeline();
@@ -2418,6 +2429,13 @@ namespace Ogre {
 
                 attrib = (GLuint)linkProgram->getAttributeIndex(sem, elemIndex);
             }
+
+            if (binding && binding->isSameBuffer(attrib,
+                                                 hwGlBuffer->getGLBufferId(),
+                                                 pBufferData))
+                return;
+            if (binding)
+                binding->setBufferId(attrib, hwGlBuffer->getGLBufferId(), pBufferData);
 
             mStateCacheManager->bindGLBuffer(GL_ARRAY_BUFFER,
                                              hwGlBuffer->getGLBufferId());
@@ -2449,7 +2467,7 @@ namespace Ogre {
                 default:
                     break;
             };
-
+            
             OGRE_CHECK_GL_ERROR(glVertexAttribPointer(attrib,
                                                       typeCount,
                                                       GLES2HardwareBufferManager::getGLType(elem.getType()),

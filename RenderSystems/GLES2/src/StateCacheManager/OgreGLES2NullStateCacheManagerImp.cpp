@@ -94,6 +94,8 @@ namespace Ogre {
         
         mColourMask.resize(4);
         mColourMask[0] = mColourMask[1] = mColourMask[2] = mColourMask[3] = GL_TRUE;
+
+        mActiveVertexArray = 0;
     }
     
     void GLES2StateCacheManagerImp::bindGLBuffer(GLenum target, GLuint buffer, bool force)
@@ -310,6 +312,28 @@ namespace Ogre {
     void GLES2StateCacheManagerImp::setDisabled(GLenum flag)
     {
         OGRE_CHECK_GL_ERROR(glDisable(flag));
+    }
+
+    void GLES2StateCacheManagerImp::bindVertexArray(GLuint vao)
+    {
+        if (!glBindVertexArrayOES)
+            return;
+
+        mActiveVertexArray = vao;
+        OGRE_CHECK_GL_ERROR(glBindVertexArrayOES(vao));
+    }
+
+    void GLES2StateCacheManagerImp::deleteVertexArray(GLuint vao)
+    {
+        if (!glDeleteVertexArraysOES)
+            return;
+
+        OGRE_CHECK_GL_ERROR(glDeleteVertexArraysOES(1, &vao));
+    }
+
+    GLuint GLES2StateCacheManagerImp::getActiveVertexArray()
+    {
+        return mActiveVertexArray;
     }
 
     void GLES2StateCacheManagerImp::setVertexAttribEnabled(GLuint attrib)

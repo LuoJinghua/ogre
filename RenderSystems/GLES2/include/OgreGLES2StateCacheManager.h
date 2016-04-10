@@ -248,6 +248,21 @@ namespace Ogre
          */
         void setDisabled(GLenum flag);
 
+        /** Bind a vertex buffer object
+         @param vao The vertex buffer object to bind.
+         */
+        void bindVertexArray(GLuint vao);
+
+        /** Delete a vertex buffer array object.
+         @param vao The buffer ID.
+         */
+        void deleteVertexArray(GLuint vao);
+
+        /** Get the active vertex buffer object
+         @return GLuint The active vertex buffer object.
+         */
+        GLuint getActiveVertexArray();
+
         /** Enables a vertex attribute.
          @param attrib The attribute to enable.
          */

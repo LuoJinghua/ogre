@@ -65,7 +65,9 @@ namespace Ogre
         unsigned int mDiscardBuffers;
         /// Stores the current depth clearing colour
         GLclampf mClearDepth;
-        
+        /// Stores the currently active vertex array
+        GLuint mActiveVertexArray;
+
     public:
         GLES2StateCacheManagerImp(void);
         ~GLES2StateCacheManagerImp(void);
@@ -154,6 +156,15 @@ namespace Ogre
         
         /// See GLES2StateCacheManager.setDisabled.
         void setDisabled(GLenum flag);
+
+        /// See GLES2StateCacheManager.bindVertexArray.
+        void bindVertexArray(GLuint vao);
+
+        /// See GLES2StateCacheManager.deleteVertexArray.
+        void deleteVertexArray(GLuint vao);
+
+        /// See GLES2StateCacheManager.getActiveVertexArray.
+        GLuint getActiveVertexArray();
 
         /// See GLES2StateCacheManager.setVertexAttribEnabled.
         void setVertexAttribEnabled(GLuint attrib);

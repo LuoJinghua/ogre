@@ -30,46 +30,81 @@ THE SOFTWARE.
 #include "OgreLogManager.h"
 #include "OgreStringConverter.h"
 #include "OgreRoot.h"
+#include "OgreGLES2RenderSystem.h"
+#include "OgreGLES2StateCacheManager.h"
+#include "OgreGLES2Support.h"
 
 namespace Ogre {
 
 	//-----------------------------------------------------------------------
 	GLES2VertexDeclaration::GLES2VertexDeclaration()
         :
-        mVAO(0),
-        mIsInitialised(false)
+        mVAO(0)
 	{
-#if OGRE_NO_GLES2_VAO_SUPPORT == 0
-#   if defined(GL_OES_vertex_array_object) || (OGRE_NO_GLES3_SUPPORT == 0)
-        if (Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_VAO))
-        {
-            OGRE_CHECK_GL_ERROR(glGenVertexArraysOES(1, &mVAO));
-    //        LogManager::getSingleton().logMessage("Created VAO " + StringConverter::toString(mVAO));
-
-            if (!mVAO)
-            {
-                OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR,
-                        "Cannot create GL ES Vertex Array Object",
-                        "GLES2VertexDeclaration::GLES2VertexDeclaration");
-            }
-        }
-#   endif
-#endif
 	}
 
 	//-----------------------------------------------------------------------
 	GLES2VertexDeclaration::~GLES2VertexDeclaration()
 	{
+        _destroyInernalResource();
+	}
+
+    //-----------------------------------------------------------------------
+    void GLES2VertexDeclaration::_createInternalResource()
+    {
+        if (mVAO)
+            return;
+
 #if OGRE_NO_GLES2_VAO_SUPPORT == 0
 #   if defined(GL_OES_vertex_array_object) || (OGRE_NO_GLES3_SUPPORT == 0)
-        if (Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_VAO))
+        OGRE_CHECK_GL_ERROR(glGenVertexArraysOES(1, &mVAO));
+//        LogManager::getSingleton().logMessage("Created VAO " + StringConverter::toString(mVAO));
+        
+        if (!mVAO)
         {
-//        LogManager::getSingleton().logMessage("Deleting VAO " + StringConverter::toString(mVAO));
-            OGRE_CHECK_GL_ERROR(glDeleteVertexArraysOES(1, &mVAO));
+            OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR,
+                        "Cannot create GL ES Vertex Array Object",
+                        "GLES2VertexDeclaration::GLES2VertexDeclaration");
         }
 #   endif
 #endif
-	}
+    }
+
+    //-----------------------------------------------------------------------
+    void GLES2VertexDeclaration::_destroyInernalResource()
+    {
+#if OGRE_NO_GLES2_VAO_SUPPORT == 0
+#   if defined(GL_OES_vertex_array_object) || (OGRE_NO_GLES3_SUPPORT == 0)
+        if (mVAO &&
+            Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_VAO))
+        {
+//            LogManager::getSingleton().logMessage("Deleting VAO " + StringConverter::toString(mVAO));
+            getGLES2SupportRef()->getStateCacheManager()->deleteVertexArray(mVAO);
+            mVAO = 0;
+        }
+        mBinding.clear();
+#   endif
+#endif
+    }
+
+    //-----------------------------------------------------------------------
+    void GLES2VertexDeclaration::_load()
+    {
+        if (!mVAO)
+            _createInternalResource();
+    }
+
+#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
+    void GLES2VertexDeclaration::notifyOnContextLost()
+    {
+        mVAO = 0;
+        mBinding.clear();
+    }
+
+    void GLES2VertexDeclaration::notifyOnContextReset()
+    {
+    }
+#endif
 
 	//-----------------------------------------------------------------------
     void GLES2VertexDeclaration::bind(void)
@@ -78,8 +113,8 @@ namespace Ogre {
 #   if defined(GL_OES_vertex_array_object) || (OGRE_NO_GLES3_SUPPORT == 0)
         if (mVAO)
         {
-//        LogManager::getSingleton().logMessage("Binding VAO " + StringConverter::toString(mVAO));
-            OGRE_CHECK_GL_ERROR(glBindVertexArrayOES(mVAO));
+//            LogManager::getSingleton().logMessage("Binding VAO " + StringConverter::toString(mVAO));
+            getGLES2SupportRef()->getStateCacheManager()->bindVertexArray(mVAO);
         }
 #   endif
 #endif

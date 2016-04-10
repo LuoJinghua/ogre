@@ -240,6 +240,21 @@ namespace Ogre {
         mImp->setDisabled(flag);
     }
 
+    void GLES2StateCacheManager::bindVertexArray(GLuint vao)
+    {
+        mImp->bindVertexArray(vao);
+    }
+
+    void GLES2StateCacheManager::deleteVertexArray(GLuint vao)
+    {
+        mImp->deleteVertexArray(vao);
+    }
+
+    GLuint GLES2StateCacheManager::getActiveVertexArray()
+    {
+        return mImp->getActiveVertexArray();
+    }
+
     void GLES2StateCacheManager::setVertexAttribEnabled(GLuint attrib)
     {
         mImp->setVertexAttribEnabled(attrib);
