@@ -61,6 +61,10 @@ namespace Ogre {
 
         String tmpStr = (const char*)pcVer;
         LogManager::getSingleton().logMessage("GL_VERSION = " + tmpStr);
+        if (tmpStr.find_first_of("0123456789") != std::string::npos)
+            mVersion = tmpStr.substr(tmpStr.find_first_of("0123456789"));
+        else
+            mVersion.clear();
         mVersion = tmpStr.substr(0, tmpStr.find(" "));
 
         // Get vendor
