@@ -148,7 +148,7 @@ namespace Ogre {
 			mNumMipmaps = maxMips;
 
         if(getGLES2SupportRef()->checkExtension("GL_APPLE_texture_max_level") || gleswIsSupported(3, 0))
-			mGLSupport.getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_MAX_LEVEL_APPLE, mNumRequestedMipmaps ? mNumMipmaps + 1 : 0);
+			mGLSupport.getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_MAX_LEVEL_APPLE, mNumRequestedMipmaps ? mNumMipmaps : 0);
 
 		// Set some misc default parameters, these can of course be changed later
 		mGLSupport.getStateCacheManager()->setTexParameteri(texTarget,
@@ -160,8 +160,8 @@ namespace Ogre {
         mGLSupport.getStateCacheManager()->setTexParameteri(texTarget,
                                                             GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        // Set up texture swizzling
 #if OGRE_NO_GLES3_SUPPORT == 0
+        // Set up texture swizzling
         if(gleswIsSupported(3, 0))
         {
             OGRE_CHECK_GL_ERROR(glTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_R, GL_RED));
@@ -176,11 +176,17 @@ namespace Ogre {
                 OGRE_CHECK_GL_ERROR(glTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_B, GL_RED));
                 OGRE_CHECK_GL_ERROR(glTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_A, GL_RED));
             }
+            if(mFormat == PF_BYTE_LA)
+            {
+                OGRE_CHECK_GL_ERROR(glTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_R, GL_RED));
+                OGRE_CHECK_GL_ERROR(glTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_G, GL_RED));
+                OGRE_CHECK_GL_ERROR(glTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_B, GL_RED));
+                OGRE_CHECK_GL_ERROR(glTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_A, GL_GREEN));
+            }
         }
 #endif
 
         // Allocate internal buffer so that glTexSubImageXD can be used
-        // Internal format
         GLenum format = GLES2PixelUtil::getGLOriginFormat(mFormat);
         GLenum internalformat = GLES2PixelUtil::getClosestGLInternalFormat(mFormat, mHwGamma);
         uint32 width = mWidth;
@@ -266,82 +272,88 @@ namespace Ogre {
                                                       " Height: " + StringConverter::toString(height) +
                                                       " Internal Format: " + StringConverter::toString(internalformat, 0, ' ', std::ios::hex));
 #endif
-            switch(mTextureType)
+            if (gleswIsSupported(3, 0) &&
+                internalformat != GL_LUMINANCE && internalformat != GL_ALPHA && internalformat != GL_LUMINANCE_ALPHA)
             {
-                case TEX_TYPE_1D:
-                case TEX_TYPE_2D:
-                case TEX_TYPE_2D_RECT:
-                    OGRE_CHECK_GL_ERROR(glTexStorage2D(GL_TEXTURE_2D, GLsizei(mNumMipmaps+1), internalformat, GLsizei(width), GLsizei(height)));
-                    break;
-                case TEX_TYPE_CUBE_MAP:
-                    OGRE_CHECK_GL_ERROR(glTexStorage2D(GL_TEXTURE_CUBE_MAP, GLsizei(mNumMipmaps+1), internalformat, GLsizei(width), GLsizei(height)));
-                    break;
-                case TEX_TYPE_2D_ARRAY:
-                    OGRE_CHECK_GL_ERROR(glTexStorage3D(GL_TEXTURE_2D_ARRAY, GLsizei(mNumMipmaps+1), internalformat, GLsizei(width), GLsizei(height), GLsizei(depth)));
-                    break;
-                case TEX_TYPE_3D:
-                    OGRE_CHECK_GL_ERROR(glTexStorage3D(GL_TEXTURE_3D, GLsizei(mNumMipmaps+1), internalformat, GLsizei(width), GLsizei(height), GLsizei(depth)));
-                    break;
+                switch(mTextureType)
+                {
+                    case TEX_TYPE_1D:
+                    case TEX_TYPE_2D:
+                    case TEX_TYPE_2D_RECT:
+                        OGRE_CHECK_GL_ERROR(glTexStorage2D(GL_TEXTURE_2D, GLsizei(mNumMipmaps+1), internalformat, GLsizei(width), GLsizei(height)));
+                        break;
+                    case TEX_TYPE_CUBE_MAP:
+                        OGRE_CHECK_GL_ERROR(glTexStorage2D(GL_TEXTURE_CUBE_MAP, GLsizei(mNumMipmaps+1), internalformat, GLsizei(width), GLsizei(height)));
+                        break;
+                    case TEX_TYPE_2D_ARRAY:
+                        OGRE_CHECK_GL_ERROR(glTexStorage3D(GL_TEXTURE_2D_ARRAY, GLsizei(mNumMipmaps+1), internalformat, GLsizei(width), GLsizei(height), GLsizei(depth)));
+                        break;
+                    case TEX_TYPE_3D:
+                        OGRE_CHECK_GL_ERROR(glTexStorage3D(GL_TEXTURE_3D, GLsizei(mNumMipmaps+1), internalformat, GLsizei(width), GLsizei(height), GLsizei(depth)));
+                        break;
+                }
             }
-#else
-            GLenum datatype = GLES2PixelUtil::getGLOriginDataType(mFormat);
+            else
+#endif
+            {
+                GLenum datatype = GLES2PixelUtil::getGLOriginDataType(mFormat);
 
-            // Run through this process to pregenerate mipmap pyramid
-            for(GLint mip = 0; mip <= mNumMipmaps; mip++)
-            {
-#if OGRE_DEBUG_MODE
-                LogManager::getSingleton().logMessage("GLES2Texture::create - Mip: " + StringConverter::toString(mip) +
-                                                      " Name: " + mName +
-                                                      " ID: " + StringConverter::toString(mTextureID) +
-                                                      " Width: " + StringConverter::toString(width) +
-                                                      " Height: " + StringConverter::toString(height) +
-                                                      " Internal Format: " + StringConverter::toString(internalformat, 0, ' ', std::ios::hex) +
-                                                      " Format: " + StringConverter::toString(format, 0, ' ', std::ios::hex) +
-                                                      " Datatype: " + StringConverter::toString(datatype, 0, ' ', std::ios::hex)
-                                                      );
-#endif
-				// Normal formats
-				switch(mTextureType)
-				{
-					case TEX_TYPE_1D:
-					case TEX_TYPE_2D:
-#if OGRE_PLATFORM == OGRE_PLATFORM_NACL
-                        if(internalformat != format)
-                        {
-                            LogManager::getSingleton().logMessage("glTexImage2D: format != internalFormat, "
-                                "format=" + StringConverter::toString(format) + 
-                                ", internalFormat=" + StringConverter::toString(internalformat));
-                        }
-#endif
-                        OGRE_CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D,
-                                     mip,
-                                     internalformat,
-                                     width, height,
-                                     0,
-                                     format,
-                                     datatype, 0));
-                        break;
-					case TEX_TYPE_CUBE_MAP:
-						for(int face = 0; face < 6; face++) {
-							OGRE_CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, mip, internalformat,
-								width, height, 0, 
-								format, datatype, 0));
-						}
-						break;
-                    default:
-                        break;
-                };
-                
-                if (width > 1)
+                // Run through this process to pregenerate mipmap pyramid
+                for(GLint mip = 0; mip <= mNumMipmaps; mip++)
                 {
-                    width = Bitwise::firstPO2From(width / 2);
-                }
-                if (height > 1)
-                {
-                    height = Bitwise::firstPO2From(height / 2);
+    #if OGRE_DEBUG_MODE
+                    LogManager::getSingleton().logMessage("GLES2Texture::create - Mip: " + StringConverter::toString(mip) +
+                                                          " Name: " + mName +
+                                                          " ID: " + StringConverter::toString(mTextureID) +
+                                                          " Width: " + StringConverter::toString(width) +
+                                                          " Height: " + StringConverter::toString(height) +
+                                                          " Internal Format: " + StringConverter::toString(internalformat, 0, ' ', std::ios::hex) +
+                                                          " Format: " + StringConverter::toString(format, 0, ' ', std::ios::hex) +
+                                                          " Datatype: " + StringConverter::toString(datatype, 0, ' ', std::ios::hex)
+                                                          );
+    #endif
+                    // Normal formats
+                    switch(mTextureType)
+                    {
+                        case TEX_TYPE_1D:
+                        case TEX_TYPE_2D:
+    #if OGRE_PLATFORM == OGRE_PLATFORM_NACL
+                            if(internalformat != format)
+                            {
+                                LogManager::getSingleton().logMessage("glTexImage2D: format != internalFormat, "
+                                    "format=" + StringConverter::toString(format) + 
+                                    ", internalFormat=" + StringConverter::toString(internalformat));
+                            }
+    #endif
+                            OGRE_CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_2D,
+                                         mip,
+                                         internalformat,
+                                         width, height,
+                                         0,
+                                         format,
+                                         datatype, 0));
+                            break;
+                        case TEX_TYPE_CUBE_MAP:
+                            for(int face = 0; face < 6; face++) {
+                                OGRE_CHECK_GL_ERROR(glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, mip, internalformat,
+                                    width, height, 0, 
+                                    format, datatype, 0));
+                            }
+                            break;
+                        default:
+                            break;
+                    };
+                    
+                    if (width > 1)
+                    {
+                        width = Bitwise::firstPO2From(width / 2);
+                    }
+                    if (height > 1)
+                    {
+                        height = Bitwise::firstPO2From(height / 2);
+                    }
                 }
             }
-#endif
         }
     }
     

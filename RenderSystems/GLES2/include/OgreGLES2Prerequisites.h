@@ -197,8 +197,16 @@ namespace Ogre {
 #define GL_TEXTURE_MAX_LEVEL_APPLE GL_TEXTURE_MAX_LEVEL
 #endif
 
+/* GL_APPLE_framebuffer_multisample */
 #ifndef GL_APPLE_framebuffer_multisample
-#define GL_MAX_SAMPLES_APPLE GL_MAX_SAMPLES
+#define GL_APPLE_framebuffer_multisample 1
+#define GL_RENDERBUFFER_SAMPLES_APPLE                           0x8CAB
+#define GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE_APPLE             0x8D56
+#define GL_MAX_SAMPLES_APPLE                                    0x8D57
+#define GL_READ_FRAMEBUFFER_APPLE                               0x8CA8
+#define GL_DRAW_FRAMEBUFFER_APPLE                               0x8CA9
+#define GL_DRAW_FRAMEBUFFER_BINDING_APPLE                       0x8CA6
+#define GL_READ_FRAMEBUFFER_BINDING_APPLE                       0x8CAA
 #define glRenderbufferStorageMultisampleAPPLE glRenderbufferStorageMultisample
 #endif
 
@@ -233,6 +241,12 @@ namespace Ogre {
 #define glDeleteSyncAPPLE glDeleteSync
 #endif
 
+#define GL_TEXTURE_WRAP_R_OES GL_TEXTURE_WRAP_R
+#define GL_TEXTURE_COMPARE_MODE_EXT GL_TEXTURE_COMPARE_MODE
+#define GL_TEXTURE_COMPARE_FUNC_EXT GL_TEXTURE_COMPARE_FUNC
+#define GL_COMPARE_REF_TO_TEXTURE_EXT GL_COMPARE_REF_TO_TEXTURE
+
+#define GL_NUM_PROGRAM_BINARY_FORMATS_OES GL_NUM_PROGRAM_BINARY_FORMATS
 #define GL_PROGRAM_BINARY_LENGTH_OES GL_PROGRAM_BINARY_LENGTH
 #define glProgramBinaryOES glProgramBinary
 #define glGetProgramBinaryOES glGetProgramBinary
@@ -243,6 +257,17 @@ namespace Ogre {
 #define glBindVertexArrayOES glBindVertexArray
 #define glGenVertexArraysOES glGenVertexArrays
 #define glDeleteVertexArraysOES glDeleteVertexArrays
+#endif
+
+#ifndef GL_STENCIL_INDEX1_OES
+#define GL_STENCIL_INDEX1_OES                                   0x8D46
+#endif
+#ifndef GL_STENCIL_INDEX4_OES
+#define GL_STENCIL_INDEX4_OES                                   0x8D47
+#endif
+
+#ifndef GL_DEPTH32F_STENCIL8
+#define GL_DEPTH32F_STENCIL8                                    0x8CAD
 #endif
 
 #if (OGRE_PLATFORM == OGRE_PLATFORM_WIN32)

@@ -323,10 +323,28 @@ namespace Ogre {
         mTextureID = textureID;
     }
 #endif
-    
-#if OGRE_NO_GLES3_SUPPORT == 0
+
+    //-----------------------------------------------------------------------------
     void GLES2TextureBuffer::upload(const PixelBox &data, const Image::Box &dest)
     {
+        if (gleswIsSupported(3, 0))
+            uploadGLES3Impl(data, dest);
+        else
+            uploadGLES2Impl(data, dest);
+    }
+
+    //-----------------------------------------------------------------------------
+    void GLES2TextureBuffer::download(const PixelBox &data)
+    {
+        if (gleswIsSupported(3, 0))
+            downloadGLES3Impl(data);
+        else
+            downloadGLES2Impl(data);
+    }
+
+    void GLES2TextureBuffer::uploadGLES3Impl(const PixelBox &data, const Image::Box &dest)
+    {
+#if OGRE_NO_GLES3_SUPPORT == 0
         getGLES2SupportRef()->getStateCacheManager()->bindGLTexture(mTarget, mTextureID);
 
         OGRE_CHECK_GL_ERROR(glGenBuffers(1, &mBufferId));
@@ -471,11 +489,13 @@ namespace Ogre {
         OGRE_CHECK_GL_ERROR(glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, 0));
         OGRE_CHECK_GL_ERROR(glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0));
         OGRE_CHECK_GL_ERROR(glPixelStorei(GL_UNPACK_ALIGNMENT, 4));
+#endif
     }
     
     //-----------------------------------------------------------------------------  
-    void GLES2TextureBuffer::download(const PixelBox &data)
+    void GLES2TextureBuffer::downloadGLES3Impl(const PixelBox &data)
     {
+#if OGRE_NO_GLES3_SUPPORT == 0
         if(data.getWidth() != getWidth() ||
            data.getHeight() != getHeight() ||
            data.getDepth() != getDepth())
@@ -570,9 +590,10 @@ namespace Ogre {
         OGRE_CHECK_GL_ERROR(glBindBuffer(GL_PIXEL_PACK_BUFFER, 0));
         OGRE_CHECK_GL_ERROR(glDeleteBuffers(1, &mBufferId));
         mBufferId = 0;
+#endif
     }
-#else
-    void GLES2TextureBuffer::upload(const PixelBox &data, const Image::Box &dest)
+
+    void GLES2TextureBuffer::uploadGLES2Impl(const PixelBox &data, const Image::Box &dest)
     {
 #if OGRE_DEBUG_MODE
         LogManager::getSingleton().logMessage("GLES2TextureBuffer::upload - ID: " + StringConverter::toString(mTextureID) +
@@ -677,7 +698,7 @@ namespace Ogre {
     }
 
     //-----------------------------------------------------------------------------  
-    void GLES2TextureBuffer::download(const PixelBox &data)
+    void GLES2TextureBuffer::downloadGLES2Impl(const PixelBox &data)
     {
         if(data.getWidth() != getWidth() ||
            data.getHeight() != getHeight() ||
@@ -732,8 +753,8 @@ namespace Ogre {
         OGRE_CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, currentFBO));
         OGRE_CHECK_GL_ERROR(glDeleteFramebuffers(1, &tempFBO));
     }
-#endif
-    //-----------------------------------------------------------------------------  
+    
+    //-----------------------------------------------------------------------------
     void GLES2TextureBuffer::bindToFramebuffer(GLenum attachment, size_t zoffset)
     {
         assert(zoffset < mDepth);
@@ -837,12 +858,16 @@ namespace Ogre {
         OGRE_CHECK_GL_ERROR(glTexParameteri(src->mTarget, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
         OGRE_CHECK_GL_ERROR(glTexParameteri(src->mTarget, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
 #if OGRE_NO_GLES3_SUPPORT == 0
-        OGRE_CHECK_GL_ERROR(glTexParameteri(src->mTarget, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE));
+        if (gleswIsSupported(3, 0))
+        {
+            OGRE_CHECK_GL_ERROR(glTexParameteri(src->mTarget, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE));
 
-        // Set origin base level mipmap to make sure we source from the right mip
-        // level.
-        OGRE_CHECK_GL_ERROR(glTexParameteri(src->mTarget, GL_TEXTURE_BASE_LEVEL, src->mLevel));
+            // Set origin base level mipmap to make sure we source from the right mip
+            // level.
+            OGRE_CHECK_GL_ERROR(glTexParameteri(src->mTarget, GL_TEXTURE_BASE_LEVEL, src->mLevel));
+        }
 #endif
+
         // Store old binding so it can be restored later
         GLint oldfb;
         OGRE_CHECK_GL_ERROR(glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldfb));
@@ -979,7 +1004,8 @@ namespace Ogre {
         getGLES2SupportRef()->getStateCacheManager()->bindGLTexture(src->mTarget, src->mTextureID);
 
 #if OGRE_NO_GLES3_SUPPORT == 0
-        OGRE_CHECK_GL_ERROR(glTexParameteri(src->mTarget, GL_TEXTURE_BASE_LEVEL, 0));
+        if (gleswIsSupported(3, 0))
+            OGRE_CHECK_GL_ERROR(glTexParameteri(src->mTarget, GL_TEXTURE_BASE_LEVEL, 0));
 
         // Detach texture from temporary framebuffer
         if(mFormat == PF_DEPTH)
@@ -1061,18 +1087,23 @@ namespace Ogre {
 
         // Allocate texture memory
 #if OGRE_NO_GLES3_SUPPORT == 0
-        if(src.getDepth() != 1)
+        if (gleswIsSupported(3, 0))
         {
-            OGRE_CHECK_GL_ERROR(glTexStorage3D(GL_TEXTURE_3D, 1, format, GLsizei(width), GLsizei(height), GLsizei(depth)));
+            if(src.getDepth() != 1)
+            {
+                OGRE_CHECK_GL_ERROR(glTexStorage3D(GL_TEXTURE_3D, 1, format, GLsizei(width), GLsizei(height), GLsizei(depth)));
+            }
+            else
+            {
+                OGRE_CHECK_GL_ERROR(glTexStorage2D(GL_TEXTURE_2D, 1, format, GLsizei(width), GLsizei(height)));
+            }
         }
         else
-        {
-            OGRE_CHECK_GL_ERROR(glTexStorage2D(GL_TEXTURE_2D, 1, format, GLsizei(width), GLsizei(height)));
-        }
-#else
-        GLenum datatype = (GLsizei)GLES2PixelUtil::getGLOriginDataType(src.format);
-        OGRE_CHECK_GL_ERROR(glTexImage2D(target, 0, format, width, height, 0, format, datatype, 0));
 #endif
+        {
+            GLenum datatype = (GLsizei)GLES2PixelUtil::getGLOriginDataType(src.format);
+            OGRE_CHECK_GL_ERROR(glTexImage2D(target, 0, format, width, height, 0, format, datatype, 0));
+        }
 
         // GL texture buffer
         GLES2TextureBuffer tex(StringUtil::BLANK, target, id, width, height, depth, format, src.format,

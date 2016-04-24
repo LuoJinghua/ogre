@@ -95,6 +95,16 @@ namespace Ogre {
                 RSC_NON_POWER_OF_2_TEXTURES is supported it returns value as-is.
             */
             static uint32 optionalPO2(uint32 value);
+
+            static void initialize();
+            static void reset();
+
+    private:
+        static map<PixelFormat, GLenum>::type mGLOriginFormatMap;
+        static map<PixelFormat, GLenum>::type mGLOriginDataTypeMap;
+        static map<PixelFormat, GLenum>::type mGLInternalFormatMap;
+        static map<PixelFormat, GLenum>::type mGLHwGammaInternalFormatMap;
+        static map<std::pair<GLenum, GLenum>, PixelFormat>::type mClosestOgreFormat;
     };
 }
 

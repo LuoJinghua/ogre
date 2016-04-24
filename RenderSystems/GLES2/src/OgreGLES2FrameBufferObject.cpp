@@ -246,21 +246,25 @@ namespace Ogre {
 		}
 
 #if OGRE_NO_GLES3_SUPPORT == 0
-        // Drawbuffer extension supported, use it
-        if(getFormat() != PF_DEPTH)
-            OGRE_CHECK_GL_ERROR(glDrawBuffers(n, bufs));
+        if (gleswIsSupported(3, 0))
+        {
+            // Drawbuffer extension supported, use it
+            if (getFormat() != PF_DEPTH)
+                OGRE_CHECK_GL_ERROR(glDrawBuffers(n, bufs));
 
-		if (mMultisampleFB)
-		{
-			// we need a read buffer because we'll be blitting to mFB
-			OGRE_CHECK_GL_ERROR(glReadBuffer(bufs[0]));
-		}
-		else
-		{
-			// No read buffer, by default, if we want to read anyway we must not forget to set this.
-			OGRE_CHECK_GL_ERROR(glReadBuffer(GL_NONE));
-		}
+            if (mMultisampleFB)
+            {
+                // we need a read buffer because we'll be blitting to mFB
+                OGRE_CHECK_GL_ERROR(glReadBuffer(bufs[0]));
+            }
+            else
+            {
+                // No read buffer, by default, if we want to read anyway we must not forget to set this.
+                OGRE_CHECK_GL_ERROR(glReadBuffer(GL_NONE));
+            }
+        }
 #endif
+
         // Check status
         GLuint status;
         OGRE_CHECK_GL_ERROR(status = glCheckFramebufferStatus(GL_FRAMEBUFFER));
@@ -302,17 +306,20 @@ namespace Ogre {
 		if (mMultisampleFB)
 		{
 #if OGRE_NO_GLES3_SUPPORT == 0
-            GLint oldfb = 0;
-            OGRE_CHECK_GL_ERROR(glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldfb));
+            if (gleswIsSupported(3, 0))
+            {
+                GLint oldfb = 0;
+                OGRE_CHECK_GL_ERROR(glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldfb));
 
-			// Blit from multisample buffer to final buffer, triggers resolve
-			uint32 width = mColour[0].buffer->getWidth();
-			uint32 height = mColour[0].buffer->getHeight();
-			OGRE_CHECK_GL_ERROR(glBindFramebuffer(GL_READ_FRAMEBUFFER, mMultisampleFB));
-			OGRE_CHECK_GL_ERROR(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFB));
-			OGRE_CHECK_GL_ERROR(glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST));
-			// Unbind
-			OGRE_CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, oldfb));
+                // Blit from multisample buffer to final buffer, triggers resolve
+                uint32 width = mColour[0].buffer->getWidth();
+                uint32 height = mColour[0].buffer->getHeight();
+                OGRE_CHECK_GL_ERROR(glBindFramebuffer(GL_READ_FRAMEBUFFER, mMultisampleFB));
+                OGRE_CHECK_GL_ERROR(glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mFB));
+                OGRE_CHECK_GL_ERROR(glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST));
+                // Unbind
+                OGRE_CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, oldfb));
+            }
 #endif
 		}
 	}

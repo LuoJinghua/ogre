@@ -93,7 +93,8 @@ namespace Ogre {
 	RenderToVertexBufferSharedPtr GLES2HardwareBufferManagerBase::createRenderToVertexBuffer()
 	{
 #if OGRE_NO_GLES3_SUPPORT == 0
-		return RenderToVertexBufferSharedPtr(new GLES2RenderToVertexBuffer());
+		if (gleswIsSupported(3, 0))
+			return RenderToVertexBufferSharedPtr(new GLES2RenderToVertexBuffer());
 #else
 		// not supported
 		return RenderToVertexBufferSharedPtr();
@@ -173,13 +174,16 @@ namespace Ogre {
     Ogre::HardwareUniformBufferSharedPtr GLES2HardwareBufferManagerBase::createUniformBuffer( size_t sizeBytes, HardwareBuffer::Usage usage, bool useShadowBuffer, const String& name )
     {
 #if OGRE_NO_GLES3_SUPPORT == 0
-        GLES2HardwareUniformBuffer* buf =
-        new GLES2HardwareUniformBuffer(this, sizeBytes, usage, useShadowBuffer, name);
-        {
-            OGRE_LOCK_MUTEX(mUniformBuffersMutex);
-            mUniformBuffers.insert(buf);
-        }
-        return HardwareUniformBufferSharedPtr(buf);
+		if (gleswIsSupported(3, 0))
+		{
+			GLES2HardwareUniformBuffer* buf =
+			new GLES2HardwareUniformBuffer(this, sizeBytes, usage, useShadowBuffer, name);
+			{
+				OGRE_LOCK_MUTEX(mUniformBuffersMutex);
+				mUniformBuffers.insert(buf);
+			}
+			return HardwareUniformBufferSharedPtr(buf);
+		}
 #else
         OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
             "GLES2 does not support uniform buffer objects", 

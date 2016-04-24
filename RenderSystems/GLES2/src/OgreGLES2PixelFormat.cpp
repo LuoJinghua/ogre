@@ -28,10 +28,35 @@ THE SOFTWARE.
 
 #include "OgreGLES2PixelFormat.h"
 #include "OgreRoot.h"
-#include "OgreRenderSystem.h"
+#include "OgreGLES2RenderSystem.h"
+#include "OgreGLES2Support.h"
 #include "OgreBitwise.h"
 
-#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
+/* GL_IMG_texture_compression_pvrtc */
+#ifndef GL_IMG_texture_compression_pvrtc
+#define GL_IMG_texture_compression_pvrtc 1
+#define GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG                      0x8C00
+#define GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG                      0x8C01
+#define GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG                     0x8C02
+#define GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG                     0x8C03
+#endif
+
+/* GL_IMG_texture_compression_pvrtc2 */
+#ifndef GL_IMG_texture_compression_pvrtc2
+#define GL_IMG_texture_compression_pvrtc2 1
+#define GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG                     0x9137
+#define GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG                     0x9138
+#endif
+
+/* GL_AMD_compressed_ATC_texture */
+#ifndef GL_AMD_compressed_ATC_texture
+#define GL_AMD_compressed_ATC_texture 1
+#define GL_ATC_RGB_AMD                                          0x8C92
+#define GL_ATC_RGBA_EXPLICIT_ALPHA_AMD                          0x8C93
+#define GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD                      0x87EE
+#endif
+
+#if 1 //OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
 #ifndef GL_EXT_texture_compression_dxt1
 #define GL_EXT_texture_compression_dxt1 1
 #define GL_COMPRESSED_RGB_S3TC_DXT1_EXT                   0x83F0
@@ -53,545 +78,641 @@ THE SOFTWARE.
 #endif
 
 namespace Ogre {
+    map<PixelFormat, GLenum>::type GLES2PixelUtil::mGLOriginFormatMap;
+    map<PixelFormat, GLenum>::type GLES2PixelUtil::mGLOriginDataTypeMap;
+    map<PixelFormat, GLenum>::type GLES2PixelUtil::mGLInternalFormatMap;
+    map<PixelFormat, GLenum>::type GLES2PixelUtil::mGLHwGammaInternalFormatMap;
+    map<std::pair<GLenum, GLenum>, PixelFormat>::type GLES2PixelUtil::mClosestOgreFormat;
+
+    void GLES2PixelUtil::initialize()
+    {
+        if (!mGLOriginFormatMap.empty())
+            return;
+
+        mGLOriginFormatMap[PF_A8] = GL_ALPHA;
+        mGLOriginFormatMap[PF_DEPTH] = GL_DEPTH_COMPONENT;
+
+        mGLOriginFormatMap[PF_R5G6B5] = GL_RGB;
+        mGLOriginFormatMap[PF_B5G6R5] = GL_RGB;
+        mGLOriginFormatMap[PF_R8G8B8] = GL_RGB;
+        mGLOriginFormatMap[PF_B8G8R8] = GL_RGB;
+        mGLOriginFormatMap[PF_X8B8G8R8] = GL_RGB;
+        mGLOriginFormatMap[PF_SHORT_RGB] = GL_RGB;
+
+
+        mGLOriginFormatMap[PF_A4R4G4B4] = GL_RGBA;
+        mGLOriginFormatMap[PF_A1R5G5B5] = GL_RGBA;
+        mGLOriginFormatMap[PF_A2R10G10B10] = GL_RGBA;
+        mGLOriginFormatMap[PF_A2B10G10R10] = GL_RGBA;
+        mGLOriginFormatMap[PF_SHORT_RGBA] = GL_RGBA;
+        if (getGLES2SupportRef()->checkExtension("GL_APPLE_texture_format_BGRA8888"))
+        {
+            mGLOriginFormatMap[PF_X8R8G8B8] = GL_BGRA_EXT;
+            mGLOriginFormatMap[PF_A8R8G8B8] = GL_BGRA_EXT;
+            mGLOriginFormatMap[PF_B8G8R8A8] = GL_BGRA_EXT;
+            mGLOriginFormatMap[PF_A8B8G8R8] = GL_BGRA_EXT;
+            mGLOriginFormatMap[PF_R8G8B8A8] = GL_BGRA_EXT;
+        }
+        else
+        {
+            mGLOriginFormatMap[PF_X8R8G8B8] = GL_RGBA;
+            mGLOriginFormatMap[PF_A8R8G8B8] = GL_RGBA;
+            mGLOriginFormatMap[PF_B8G8R8A8] = GL_RGBA;
+            mGLOriginFormatMap[PF_A8B8G8R8] = GL_RGBA;
+            mGLOriginFormatMap[PF_R8G8B8A8] = GL_RGBA;
+        }
+
+#if GL_OES_texture_half_float || GL_EXT_color_buffer_half_float || OGRE_NO_GLES3_SUPPORT == 0
+        if (gleswIsSupported(3, 0) ||
+            (getGLES2SupportRef()->checkExtension("GL_OES_texture_half_float") ||
+             getGLES2SupportRef()->checkExtension("GL_EXT_color_buffer_half_float")))
+        {
+            mGLOriginFormatMap[PF_FLOAT16_RGB] = GL_RGB;
+            mGLOriginFormatMap[PF_FLOAT32_RGB] = GL_RGB;
+            mGLOriginFormatMap[PF_FLOAT16_RGBA] = GL_RGBA;
+            mGLOriginFormatMap[PF_FLOAT32_RGBA] = GL_RGBA;
+        }
+#endif
+
+#if OGRE_NO_GLES3_SUPPORT == 0
+        if (gleswIsSupported(3, 0) ||
+            getGLES2SupportRef()->checkExtension("GL_EXT_texture_rg"))
+        {
+            mGLOriginFormatMap[PF_R8] = GL_RED_EXT;
+            mGLOriginFormatMap[PF_RG8] = GL_RG_EXT;
+            mGLOriginFormatMap[PF_FLOAT16_R] = GL_RED_EXT;
+            mGLOriginFormatMap[PF_FLOAT32_R] = GL_RED_EXT;
+            mGLOriginFormatMap[PF_FLOAT16_GR] = GL_RG_EXT;
+            mGLOriginFormatMap[PF_FLOAT32_GR] = GL_RG_EXT;
+        }
+#endif
+#if GL_IMG_texture_compression_pvrtc
+        // if (getGLES2SupportRef()->checkExtension("GL_IMG_texture_compression_pvrtc"))
+        {
+            mGLOriginFormatMap[PF_PVRTC_RGB2] = GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG;
+            mGLOriginFormatMap[PF_PVRTC_RGB4] = GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
+            mGLOriginFormatMap[PF_PVRTC_RGBA2] = GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG;
+            mGLOriginFormatMap[PF_PVRTC_RGBA4] = GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
+        }
+#endif
+
+#if GL_IMG_texture_compression_pvrtc2
+        // if (getGLES2SupportRef()->checkExtension("GL_IMG_texture_compression_pvrtc2"))
+        {
+            mGLOriginFormatMap[PF_PVRTC2_2BPP] = GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG;
+            mGLOriginFormatMap[PF_PVRTC2_4BPP] = GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG;
+        }
+#endif
+
+#if OGRE_NO_ETC_CODEC == 0
+#	ifdef GL_OES_compressed_ETC1_RGB8_texture
+        //if (getGLES2SupportRef()->checkExtension("GL_OES_compressed_ETC1_RGB8_texture"))
+        {
+            mGLOriginFormatMap[PF_ETC1_RGB8] = GL_ETC1_RGB8_OES;
+        }
+#	endif
+#endif
+
+#ifdef GL_AMD_compressed_ATC_texture
+        //if (getGLES2SupportRef()->checkExtension("GL_AMD_compressed_ATC_texture"))
+        {
+            mGLOriginFormatMap[PF_ATC_RGB] = GL_ATC_RGB_AMD;
+            mGLOriginFormatMap[PF_ATC_RGBA_EXPLICIT_ALPHA] = GL_ATC_RGBA_EXPLICIT_ALPHA_AMD;
+            mGLOriginFormatMap[PF_ATC_RGBA_INTERPOLATED_ALPHA] = GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD;
+            
+        }
+#endif
+#ifdef GL_COMPRESSED_RGB8_ETC2
+        // if (getGLES2SupportRef()->checkExtension("GL_COMPRESSED_RGB8_ETC2") ||
+        //    gleswIsSupported(3, 0))
+        {
+            mGLOriginFormatMap[PF_ETC2_RGB8] = GL_COMPRESSED_RGB8_ETC2;
+            mGLOriginFormatMap[PF_ETC2_RGBA8] = GL_COMPRESSED_RGBA8_ETC2_EAC;
+            mGLOriginFormatMap[PF_ETC2_RGB8A1] = GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2;
+        }
+#endif
+
+#if GL_EXT_texture_compression_dxt1
+        // if (getGLES2SupportRef()->checkExtension("GL_EXT_texture_compression_dxt1"))
+        {
+            mGLOriginFormatMap[PF_DXT1] = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
+        }
+#endif
+#if GL_EXT_texture_compression_s3tc
+        // if (getGLES2SupportRef()->checkExtension("GL_EXT_texture_compression_s3tc"))
+        {
+            mGLOriginFormatMap[PF_DXT3] = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+            mGLOriginFormatMap[PF_DXT5] = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+        }
+#endif
+
+#if OGRE_NO_GLES3_SUPPORT == 0
+        if (gleswIsSupported(3, 0))
+        {
+            mGLOriginFormatMap[PF_BYTE_LA] = GL_RG;
+            mGLOriginFormatMap[PF_L8] = GL_RED;
+            mGLOriginFormatMap[PF_L16] = GL_RED;
+            mGLOriginFormatMap[PF_R8_UINT] = GL_RED_INTEGER;
+            mGLOriginFormatMap[PF_R16_UINT] = GL_RED_INTEGER;
+            mGLOriginFormatMap[PF_R32_UINT] = GL_RED_INTEGER;
+            mGLOriginFormatMap[PF_R8_SINT] = GL_RED_INTEGER;
+            mGLOriginFormatMap[PF_R16_SINT] = GL_RED_INTEGER;
+            mGLOriginFormatMap[PF_R32_SINT] = GL_RED_INTEGER;
+            mGLOriginFormatMap[PF_R8G8_UINT] = GL_RG_INTEGER;
+            mGLOriginFormatMap[PF_R16G16_UINT] = GL_RG_INTEGER;
+            mGLOriginFormatMap[PF_R32G32_UINT] = GL_RG_INTEGER;
+            mGLOriginFormatMap[PF_R8G8_SINT] = GL_RG_INTEGER;
+            mGLOriginFormatMap[PF_R16G16_SINT] = GL_RG_INTEGER;
+            mGLOriginFormatMap[PF_R32G32_SINT] = GL_RG_INTEGER;
+            mGLOriginFormatMap[PF_R8G8B8_UINT] = GL_RGB_INTEGER;
+            mGLOriginFormatMap[PF_R16G16B16_UINT] = GL_RGB_INTEGER;
+            mGLOriginFormatMap[PF_R32G32B32_UINT] = GL_RGB_INTEGER;
+            mGLOriginFormatMap[PF_R8G8B8_SINT] = GL_RGB_INTEGER;
+            mGLOriginFormatMap[PF_R16G16B16_SINT] = GL_RGB_INTEGER;
+            mGLOriginFormatMap[PF_R32G32B32_SINT] = GL_RGB_INTEGER;
+            mGLOriginFormatMap[PF_R8G8B8A8_UINT] = GL_RGBA_INTEGER;
+            mGLOriginFormatMap[PF_R16G16B16A16_UINT] = GL_RGBA_INTEGER;
+            mGLOriginFormatMap[PF_R32G32B32A32_UINT] = GL_RGBA_INTEGER;
+            mGLOriginFormatMap[PF_R8G8B8A8_SINT] = GL_RGBA_INTEGER;
+            mGLOriginFormatMap[PF_R16G16B16A16_SINT] = GL_RGBA_INTEGER;
+            mGLOriginFormatMap[PF_R32G32B32A32_SINT] = GL_RGBA_INTEGER;
+            mGLOriginFormatMap[PF_R11G11B10_FLOAT] = GL_RGB;
+            mGLOriginFormatMap[PF_R9G9B9E5_SHAREDEXP] = GL_RGB;
+            mGLOriginFormatMap[PF_R8_SNORM] = GL_R8_SNORM;
+            mGLOriginFormatMap[PF_R8G8_SNORM] = GL_RG8_SNORM;
+            mGLOriginFormatMap[PF_R8G8B8_SNORM] = GL_RGB8_SNORM;
+            mGLOriginFormatMap[PF_R8G8B8A8_SNORM] = GL_RGBA8_SNORM;
+        }
+        else
+#endif
+        {
+            mGLOriginFormatMap[PF_L8] = GL_LUMINANCE;
+            mGLOriginFormatMap[PF_L16] = GL_LUMINANCE;
+            mGLOriginFormatMap[PF_BYTE_LA] = GL_LUMINANCE_ALPHA;
+        }
+
+        mGLOriginDataTypeMap[PF_DEPTH] = GL_UNSIGNED_INT;
+        mGLOriginDataTypeMap[PF_A8] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_L8] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_L16] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_R8G8B8] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_R8G8B8] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_B8G8R8] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_BYTE_LA] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_R5G6B5] = GL_UNSIGNED_SHORT_5_6_5;
+        mGLOriginDataTypeMap[PF_B5G6R5] = GL_UNSIGNED_SHORT_5_6_5;
+        mGLOriginDataTypeMap[PF_A4R4G4B4] = GL_UNSIGNED_SHORT_4_4_4_4;
+        mGLOriginDataTypeMap[PF_SHORT_RGB] = GL_UNSIGNED_SHORT_4_4_4_4;
+        mGLOriginDataTypeMap[PF_SHORT_RGBA] = GL_UNSIGNED_SHORT_4_4_4_4;
+        mGLOriginDataTypeMap[PF_A1R5G5B5] = GL_UNSIGNED_SHORT_5_5_5_1;
+
+#if OGRE_ENDIAN == OGRE_ENDIAN_BIG
+        mGLOriginDataTypeMap[PF_X8B8G8R8] = GL_UNSIGNED_INT_8_8_8_8_REV;
+        mGLOriginDataTypeMap[PF_X8R8G8B8] = GL_UNSIGNED_INT_8_8_8_8_REV;
+        mGLOriginDataTypeMap[PF_A8B8G8R8] = GL_UNSIGNED_INT_8_8_8_8_REV;
+        mGLOriginDataTypeMap[PF_A8R8G8B8] = GL_UNSIGNED_INT_8_8_8_8_REV;
+        mGLOriginDataTypeMap[PF_B8G8R8A8] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_R8G8B8A8] = GL_UNSIGNED_BYTE;
+#else
+        mGLOriginDataTypeMap[PF_X8B8G8R8] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_X8R8G8B8] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_A8B8G8R8] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_A8R8G8B8] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_B8G8R8A8] = GL_UNSIGNED_BYTE;
+        mGLOriginDataTypeMap[PF_R8G8B8A8] = GL_UNSIGNED_BYTE;
+#endif
+
+#if GL_OES_texture_half_float || OGRE_NO_GLES3_SUPPORT == 0
+        if (gleswIsSupported(3, 0) ||
+            getGLES2SupportRef()->checkExtension("GL_OES_texture_half_float"))
+        {
+            mGLOriginDataTypeMap[PF_FLOAT16_R] = GL_HALF_FLOAT_OES;
+            mGLOriginDataTypeMap[PF_FLOAT16_GR] = GL_HALF_FLOAT_OES;
+            mGLOriginDataTypeMap[PF_FLOAT16_RGB] = GL_HALF_FLOAT_OES;
+            mGLOriginDataTypeMap[PF_FLOAT16_RGBA] = GL_HALF_FLOAT_OES;
+
+        }
+#endif
+
+#if GL_EXT_texture_rg || OGRE_NO_GLES3_SUPPORT == 0
+        if (gleswIsSupported(3, 0) ||
+            getGLES2SupportRef()->checkExtension("GL_EXT_texture_rg"))
+        {
+            mGLOriginDataTypeMap[PF_R8] = GL_UNSIGNED_BYTE;
+            mGLOriginDataTypeMap[PF_RG8] = GL_UNSIGNED_BYTE;
+        }
+#endif
+#if GL_OES_texture_float || OGRE_NO_GLES3_SUPPORT == 0
+        if (gleswIsSupported(3, 0) ||
+            getGLES2SupportRef()->checkExtension("GL_OES_texture_float"))
+        {
+            mGLOriginDataTypeMap[PF_FLOAT32_R] = GL_FLOAT;
+            mGLOriginDataTypeMap[PF_FLOAT32_GR] = GL_FLOAT;
+            mGLOriginDataTypeMap[PF_FLOAT32_RGB] = GL_FLOAT;
+            mGLOriginDataTypeMap[PF_FLOAT32_RGBA] = GL_FLOAT;
+        }
+#endif
+
+#if OGRE_NO_GLES3_SUPPORT == 0
+        if (gleswIsSupported(3, 0))
+        {
+            mGLOriginDataTypeMap[PF_A2R10G10B10] = GL_UNSIGNED_INT_2_10_10_10_REV;
+            mGLOriginDataTypeMap[PF_A2B10G10R10] = GL_UNSIGNED_INT_2_10_10_10_REV;
+            mGLOriginDataTypeMap[PF_R8_SNORM] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R8G8_SNORM] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R8G8B8_SNORM] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R8G8B8A8_SNORM] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R16_SNORM] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R16G16_SNORM] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R16G16B16_SNORM] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R16G16B16A16_SNORM] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R8_SINT] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R8G8_SINT] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R8G8B8_SINT] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R8G8B8_SINT] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R8G8B8A8_SINT] = GL_BYTE;
+            mGLOriginDataTypeMap[PF_R8_UINT] = GL_UNSIGNED_BYTE;
+            mGLOriginDataTypeMap[PF_R8G8_UINT] = GL_UNSIGNED_BYTE;
+            mGLOriginDataTypeMap[PF_R8G8B8_UINT] = GL_UNSIGNED_BYTE;
+            mGLOriginDataTypeMap[PF_R8G8B8A8_UINT] = GL_UNSIGNED_BYTE;
+            mGLOriginDataTypeMap[PF_R32_UINT] = GL_UNSIGNED_INT;
+            mGLOriginDataTypeMap[PF_R32G32_UINT] = GL_UNSIGNED_INT;
+            mGLOriginDataTypeMap[PF_R32G32B32_UINT] = GL_UNSIGNED_INT;
+            mGLOriginDataTypeMap[PF_R32G32B32A32_UINT] = GL_UNSIGNED_INT;
+            mGLOriginDataTypeMap[PF_R16_SINT] = GL_SHORT;
+            mGLOriginDataTypeMap[PF_R16G16_SINT] = GL_SHORT;
+            mGLOriginDataTypeMap[PF_R16G16B16_SINT] = GL_SHORT;
+            mGLOriginDataTypeMap[PF_R16G16B16A16_SINT] = GL_SHORT;
+            mGLOriginDataTypeMap[PF_R32G32B32_SINT] = GL_INT;
+            mGLOriginDataTypeMap[PF_R32_SINT] = GL_INT;
+            mGLOriginDataTypeMap[PF_R32G32_SINT] = GL_INT;
+            mGLOriginDataTypeMap[PF_R32G32B32A32_SINT] = GL_INT;
+
+            mGLOriginDataTypeMap[PF_R9G9B9E5_SHAREDEXP] = GL_UNSIGNED_INT_5_9_9_9_REV;
+            mGLOriginDataTypeMap[PF_R11G11B10_FLOAT] = GL_UNSIGNED_INT_10F_11F_11F_REV;
+        }
+#endif
+
+        mGLInternalFormatMap[PF_DEPTH] = GL_DEPTH_COMPONENT;
+
+#if GL_IMG_texture_compression_pvrtc
+        mGLInternalFormatMap[PF_PVRTC_RGB2] = GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG;
+        mGLInternalFormatMap[PF_PVRTC_RGB4] = GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
+        mGLInternalFormatMap[PF_PVRTC_RGBA2] = GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG;
+        mGLInternalFormatMap[PF_PVRTC_RGBA4] = GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
+#endif
+
+#if GL_IMG_texture_compression_pvrtc2
+        mGLInternalFormatMap[PF_PVRTC2_2BPP] = GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG;
+        mGLInternalFormatMap[PF_PVRTC2_4BPP] = GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG;
+#endif
+
+#if OGRE_NO_ETC_CODEC == 0
+#	ifdef GL_OES_compressed_ETC1_RGB8_texture
+        mGLInternalFormatMap[PF_ETC1_RGB8] = GL_ETC1_RGB8_OES;
+#	endif
+#endif
+
+#	ifdef GL_AMD_compressed_ATC_texture
+        mGLInternalFormatMap[PF_ATC_RGB] = GL_ATC_RGB_AMD;
+        mGLInternalFormatMap[PF_ATC_RGBA_EXPLICIT_ALPHA] = GL_ATC_RGBA_EXPLICIT_ALPHA_AMD;
+        mGLInternalFormatMap[PF_ATC_RGBA_INTERPOLATED_ALPHA] = GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD;
+        
+#	endif
+        
+#ifdef GL_COMPRESSED_RGB8_ETC2
+        mGLInternalFormatMap[PF_ETC2_RGB8] = GL_COMPRESSED_RGB8_ETC2;
+        mGLInternalFormatMap[PF_ETC2_RGBA8] = GL_COMPRESSED_RGBA8_ETC2_EAC;
+        mGLInternalFormatMap[PF_ETC2_RGB8A1] = GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2;
+#endif
+
+#if OGRE_NO_GLES3_SUPPORT == 0
+        if (gleswIsSupported(3, 0))
+        {
+            mGLInternalFormatMap[PF_A1R5G5B5] = GL_RGB5_A1;
+            mGLInternalFormatMap[PF_R5G6B5] = GL_RGB565;
+            mGLInternalFormatMap[PF_B5G6R5] = GL_RGB565;
+            mGLInternalFormatMap[PF_A4R4G4B4] = GL_RGBA4;
+            mGLInternalFormatMap[PF_R8G8B8] = GL_RGB8;
+            mGLInternalFormatMap[PF_B8G8R8] = GL_RGB8;
+            mGLHwGammaInternalFormatMap[PF_R8G8B8] = GL_SRGB8;
+            mGLHwGammaInternalFormatMap[PF_B8G8R8] = GL_SRGB8;
+
+            if (getGLES2SupportRef()->checkExtension("GL_APPLE_texture_format_BGRA8888"))
+            {
+                mGLInternalFormatMap[PF_X8R8G8B8] = GL_BGRA8_EXT;
+                mGLInternalFormatMap[PF_A8R8G8B8] = GL_BGRA8_EXT;
+                mGLInternalFormatMap[PF_B8G8R8A8] = GL_BGRA8_EXT;
+                mGLInternalFormatMap[PF_A8B8G8R8] = GL_BGRA8_EXT;
+                mGLInternalFormatMap[PF_R8G8B8A8] = GL_BGRA8_EXT;
+            }
+            else
+            {
+                mGLInternalFormatMap[PF_A8R8G8B8] = GL_RGBA8;
+                mGLInternalFormatMap[PF_B8G8R8A8] = GL_RGBA8;
+                mGLInternalFormatMap[PF_A8B8G8R8] = GL_RGBA8;
+                mGLInternalFormatMap[PF_R8G8B8A8] = GL_RGBA8;
+                mGLInternalFormatMap[PF_X8B8G8R8] = GL_RGBA8;
+                mGLInternalFormatMap[PF_X8R8G8B8] = GL_RGBA8;
+            }
+
+            mGLHwGammaInternalFormatMap[PF_A8R8G8B8] = GL_SRGB8_ALPHA8;
+            mGLHwGammaInternalFormatMap[PF_B8G8R8A8] = GL_SRGB8_ALPHA8;
+            mGLHwGammaInternalFormatMap[PF_A8B8G8R8] = GL_SRGB8_ALPHA8;
+            mGLHwGammaInternalFormatMap[PF_R8G8B8A8] = GL_SRGB8_ALPHA8;
+            mGLHwGammaInternalFormatMap[PF_X8B8G8R8] = GL_SRGB8_ALPHA8;
+            mGLHwGammaInternalFormatMap[PF_X8R8G8B8] = GL_SRGB8_ALPHA8;
+
+            mGLInternalFormatMap[PF_A2R10G10B10] = GL_RGB10_A2UI;
+            mGLInternalFormatMap[PF_A2B10G10R10] = GL_RGB10_A2UI;
+            mGLInternalFormatMap[PF_FLOAT32_RGB] = GL_RGB32F;
+            mGLInternalFormatMap[PF_FLOAT32_RGBA] = GL_RGBA32F;
+            mGLInternalFormatMap[PF_FLOAT16_RGB] = GL_RGBA16F;
+            mGLInternalFormatMap[PF_FLOAT16_RGBA] = GL_RGBA16F;
+            mGLInternalFormatMap[PF_R11G11B10_FLOAT] = GL_R11F_G11F_B10F;
+            mGLInternalFormatMap[PF_R8_UINT] = GL_R8UI;
+            mGLInternalFormatMap[PF_R8G8_UINT] = GL_RG8UI;
+            mGLInternalFormatMap[PF_R8G8B8_UINT] = GL_RGB8UI;
+            mGLInternalFormatMap[PF_R8G8B8A8_UINT] = GL_RGBA8UI;
+            mGLInternalFormatMap[PF_R16_UINT] = GL_R16UI;
+            mGLInternalFormatMap[PF_R16G16_UINT] = GL_RG16UI;
+            mGLInternalFormatMap[PF_R16G16B16_UINT] = GL_RGB16UI;
+            mGLInternalFormatMap[PF_R16G16B16A16_UINT] = GL_RGBA16UI;
+            mGLInternalFormatMap[PF_R32_UINT] = GL_R32UI;
+            mGLInternalFormatMap[PF_R32G32_UINT] = GL_RG32UI;
+            mGLInternalFormatMap[PF_R32G32B32_UINT] = GL_RGB32UI;
+            mGLInternalFormatMap[PF_R32G32B32A32_UINT] = GL_RGBA32UI;
+            mGLInternalFormatMap[PF_R8_SINT] = GL_R8I;
+            mGLInternalFormatMap[PF_R8G8_SINT] = GL_RG8I;
+            mGLInternalFormatMap[PF_R8G8B8_SINT] = GL_RG8I;
+            mGLInternalFormatMap[PF_R8G8B8A8_SINT] = GL_RGB8I;
+            mGLInternalFormatMap[PF_R16_SINT] = GL_R16I;
+            mGLInternalFormatMap[PF_R16G16_SINT] = GL_RG16I;
+            mGLInternalFormatMap[PF_R16G16B16_SINT] = GL_RGB16I;
+            mGLInternalFormatMap[PF_R16G16B16A16_SINT] = GL_RGBA16I;
+            mGLInternalFormatMap[PF_R32_SINT] = GL_R32I;
+            mGLInternalFormatMap[PF_R32G32_SINT] = GL_RG32I;
+            mGLInternalFormatMap[PF_R32G32B32_SINT] = GL_RGB32I;
+            mGLInternalFormatMap[PF_R32G32B32A32_SINT] = GL_RGBA32I;
+            mGLInternalFormatMap[PF_R9G9B9E5_SHAREDEXP] = GL_RGB9_E5;
+            mGLInternalFormatMap[PF_R8_SNORM] = GL_R8_SNORM;
+            mGLInternalFormatMap[PF_R8G8_SNORM] = GL_RG8_SNORM;
+            mGLInternalFormatMap[PF_R8G8B8_SNORM] = GL_RGB8_SNORM;
+            mGLInternalFormatMap[PF_R8G8B8A8_SNORM] = GL_RGBA8_SNORM;
+            mGLInternalFormatMap[PF_L8] = GL_R8;
+            mGLInternalFormatMap[PF_A8] = GL_R8;
+            mGLInternalFormatMap[PF_L16] = GL_R16F_EXT;
+            mGLInternalFormatMap[PF_BYTE_LA] = GL_RG8;
+        }
+        else
+#endif
+        {
+            mGLInternalFormatMap[PF_L8] = GL_LUMINANCE;
+            mGLInternalFormatMap[PF_L16] = GL_LUMINANCE;
+            mGLInternalFormatMap[PF_A8] = GL_ALPHA;
+            mGLInternalFormatMap[PF_BYTE_LA] = GL_LUMINANCE_ALPHA;
+            mGLInternalFormatMap[PF_A8R8G8B8] = GL_RGBA;
+            mGLInternalFormatMap[PF_A8B8G8R8] = GL_RGBA;
+            mGLInternalFormatMap[PF_B8G8R8A8] = GL_RGBA;
+            mGLInternalFormatMap[PF_A1R5G5B5] = GL_RGBA;
+            mGLInternalFormatMap[PF_A4R4G4B4] = GL_RGBA;
+            mGLInternalFormatMap[PF_X8B8G8R8] = GL_RGBA;
+            mGLInternalFormatMap[PF_X8R8G8B8] = GL_RGBA;
+            mGLInternalFormatMap[PF_SHORT_RGBA] = GL_RGBA;
+            mGLInternalFormatMap[PF_FLOAT16_RGB] = GL_RGB;
+            mGLInternalFormatMap[PF_FLOAT32_RGB] = GL_RGB;
+            mGLInternalFormatMap[PF_R5G6B5] = GL_RGB;
+            mGLInternalFormatMap[PF_B5G6R5] = GL_RGB;
+            mGLInternalFormatMap[PF_R8G8B8] = GL_RGB;
+            mGLInternalFormatMap[PF_B8G8R8] = GL_RGB;
+            mGLInternalFormatMap[PF_SHORT_RGB] = GL_RGB;
+        }
+
+#if GL_EXT_texture_rg || OGRE_NO_GLES3_SUPPORT == 0
+        if (gleswIsSupported(3, 0) ||
+            getGLES2SupportRef()->checkExtension("GL_EXT_texture_rg"))
+        {
+            mGLInternalFormatMap[PF_FLOAT16_R] = GL_R16F_EXT;
+            mGLInternalFormatMap[PF_FLOAT32_R] = GL_R32F_EXT;
+            mGLInternalFormatMap[PF_R8] = GL_RED_EXT;
+            mGLInternalFormatMap[PF_FLOAT16_GR] = GL_RG16F_EXT;
+            mGLInternalFormatMap[PF_FLOAT32_GR] = GL_RG32F_EXT;
+            mGLInternalFormatMap[PF_RG8] = GL_RG_EXT;
+        }
+#endif
+
+#if GL_EXT_texture_compression_dxt1
+        mGLInternalFormatMap[PF_DXT1] = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
+#endif
+#if GL_EXT_texture_compression_s3tc
+        mGLInternalFormatMap[PF_DXT3] = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+        mGLInternalFormatMap[PF_DXT5] = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+#endif
+
+        // GL format to OGRE format map
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_DEPTH_COMPONENT, 0)] = PF_DEPTH;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_DEPTH24_STENCIL8_OES, 0)] = PF_DEPTH;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_DEPTH_COMPONENT16, 0)] = PF_DEPTH;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_DEPTH_COMPONENT24_OES, 0)] = PF_DEPTH;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_DEPTH_COMPONENT32_OES, 0)] = PF_DEPTH;
+
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_LUMINANCE, 0)] = PF_L8;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_ALPHA, 0)] = PF_A8;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_LUMINANCE_ALPHA, 0)] = PF_BYTE_LA;
+
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB, GL_UNSIGNED_SHORT_5_6_5)] = PF_B5G6R5;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB, GL_HALF_FLOAT_OES)] = PF_FLOAT16_RGB;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB, GL_FLOAT)] = PF_FLOAT32_RGB;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB, 0)] = PF_R8G8B8;
+
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB8_OES, GL_UNSIGNED_SHORT_5_6_5)] = PF_B5G6R5;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB8_OES, GL_HALF_FLOAT_OES)] = PF_FLOAT16_RGB;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB8_OES, GL_FLOAT)] = PF_FLOAT32_RGB;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB8_OES, 0)] = PF_R8G8B8;
+
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA, GL_UNSIGNED_SHORT_5_5_5_1)] = PF_A1R5G5B5;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4)] = PF_A4R4G4B4;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA, GL_HALF_FLOAT_OES)] = PF_FLOAT16_RGBA;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA, GL_FLOAT)] = PF_FLOAT32_RGBA;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA, 0)] = PF_A8B8G8R8;
+
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA8_OES, GL_UNSIGNED_SHORT_5_5_5_1)] = PF_A1R5G5B5;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA8_OES, GL_UNSIGNED_SHORT_4_4_4_4)] = PF_A4R4G4B4;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA8_OES, GL_HALF_FLOAT_OES)] = PF_FLOAT16_RGBA;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA8_OES, GL_FLOAT)] = PF_FLOAT32_RGBA;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA8_OES, 0)] = PF_A8B8G8R8;
+
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_BGRA8_EXT, 0)] = PF_A8R8G8B8;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_BGRA_EXT, 0)] = PF_A8R8G8B8;
+
+#if GL_IMG_texture_compression_pvrtc
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG, 0)] = PF_PVRTC_RGB2;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG, 0)] = PF_PVRTC_RGBA2;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG, 0)] = PF_PVRTC_RGB4;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG, 0)] = PF_PVRTC_RGBA4;
+#endif
+
+#if GL_IMG_texture_compression_pvrtc2
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG, 0)] = PF_PVRTC2_2BPP;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG, 0)] = PF_PVRTC2_4BPP;
+#endif
+        
+#if OGRE_NO_ETC_CODEC == 0
+#	ifdef GL_OES_compressed_ETC1_RGB8_texture
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_ETC1_RGB8_OES, 0)] = PF_ETC1_RGB8;
+#	endif
+#endif
+        
+#ifdef GL_AMD_compressed_ATC_texture
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_ATC_RGB_AMD, 0)] = PF_ATC_RGB;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_ATC_RGBA_EXPLICIT_ALPHA_AMD, 0)] = PF_ATC_RGBA_EXPLICIT_ALPHA;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD, 0)] = PF_ATC_RGBA_INTERPOLATED_ALPHA;
+#	endif
+#ifdef GL_COMPRESSED_RGB8_ETC2
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGB8_ETC2, 0)] = PF_ETC2_RGB8;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGBA8_ETC2_EAC, 0)] = PF_ETC2_RGBA8;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2, 0)] = PF_ETC2_RGB8A1;
+#endif
+        
+#if GL_EXT_texture_compression_dxt1
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGB_S3TC_DXT1_EXT, 0)] = PF_DXT1;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, 0)] = PF_DXT1;
+#endif
+#if GL_EXT_texture_compression_s3tc
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGBA_S3TC_DXT3_EXT, 0)] = PF_DXT3;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, 0)] = PF_DXT5;
+#endif
+#if GL_EXT_texture_rg || OGRE_NO_GLES3_SUPPORT == 0
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_R8_EXT, 0)] = PF_R8;
+        mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RG8_EXT, 0)] = PF_RG8;
+#endif
+#if OGRE_NO_GLES3_SUPPORT == 0
+        if (gleswIsSupported(3, 0))
+        {
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB10_A2, 0)] = PF_A2R10G10B10;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB10_A2UI, 0)] = PF_A2R10G10B10;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_R11F_G11F_B10F, 0)] = PF_R11G11B10_FLOAT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_R8UI, 0)] = PF_R8_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RG8UI, 0)] = PF_R8G8_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB8UI, 0)] = PF_R8G8B8_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA8UI, 0)] = PF_R8G8B8A8_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_R16UI, 0)] = PF_R16_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RG16UI, 0)] = PF_R16G16_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB16UI, 0)] = PF_R16G16B16_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA16UI, 0)] = PF_R16G16B16A16_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_R32UI, 0)] = PF_R32_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RG32UI, 0)] = PF_R32G32_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB32UI, 0)] = PF_R32G32B32_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA32UI, 0)] = PF_R32G32B32A32_UINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_R8I, 0)] = PF_R8_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RG8I, 0)] = PF_R8G8_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB8I, 0)] = PF_R8G8B8_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA8I, 0)] = PF_R8G8B8A8_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_R16I, 0)] = PF_R16_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RG16I, 0)] = PF_R16G16_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB16I, 0)] = PF_R16G16B16_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA16I, 0)] = PF_R16G16B16A16_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_R32I, 0)] = PF_R32_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RG32I, 0)] = PF_R32G32_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB32I, 0)] = PF_R32G32B32_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA32I, 0)] = PF_R32G32B32A32_SINT;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB9_E5, 0)] = PF_R9G9B9E5_SHAREDEXP;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_R8_SNORM, 0)] = PF_R8_SNORM;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RG8_SNORM, 0)] = PF_R8G8_SNORM;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB8_SNORM, 0)] = PF_R8G8B8_SNORM;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA8_SNORM, 0)] = PF_R8G8B8A8_SNORM;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_SRGB8, 0)] = PF_X8R8G8B8;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_SRGB8_ALPHA8, 0)] = PF_A8R8G8B8;
+        }
+#endif
+        
+#if GL_EXT_color_buffer_half_float || (OGRE_NO_GLES3_SUPPORT == 0)
+        if (gleswIsSupported(3, 0) ||
+            getGLES2SupportRef()->checkExtension("GL_EXT_color_buffer_half_float"))
+        {
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA16F_EXT, 0)] = PF_FLOAT16_RGBA;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB16F_EXT, 0)] = PF_FLOAT16_RGB;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RG16F_EXT, 0)] = PF_FLOAT16_GR;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_R16F_EXT, 0)] = PF_FLOAT16_R;
+        }
+#endif
+        
+#if GL_EXT_color_buffer_float || (OGRE_NO_GLES3_SUPPORT == 0)
+        if (gleswIsSupported(3, 0) ||
+            getGLES2SupportRef()->checkExtension("GL_EXT_color_buffer_float"))
+        {
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGBA32F_EXT, 0)] = PF_FLOAT32_RGBA;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RGB32F_EXT, 0)] = PF_FLOAT32_RGB;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_RG32F_EXT, 0)] = PF_FLOAT32_GR;
+            mClosestOgreFormat[std::pair<GLenum, GLenum>(GL_R32F_EXT, 0)] = PF_FLOAT32_R;
+        }
+#endif
+    }
+
+    void GLES2PixelUtil::reset()
+    {
+        mGLOriginFormatMap.clear();
+        mGLOriginDataTypeMap.clear();
+        mGLInternalFormatMap.clear();
+        mClosestOgreFormat.clear();
+    }
+
 	//-----------------------------------------------------------------------------
     GLenum GLES2PixelUtil::getGLOriginFormat(PixelFormat mFormat)
     {
-        switch (mFormat)
-        {
-            case PF_A8:
-                return GL_ALPHA;
-            case PF_DEPTH:
-                return GL_DEPTH_COMPONENT;
+        initialize();
 
-#if GL_OES_texture_half_float || GL_EXT_color_buffer_half_float || (OGRE_NO_GLES3_SUPPORT == 0) && OGRE_PLATFORM != OGRE_PLATFORM_NACL
-            case PF_FLOAT16_RGB:
-            case PF_FLOAT32_RGB:
-                return GL_RGB;
-            case PF_FLOAT16_RGBA:
-            case PF_FLOAT32_RGBA:
-                return GL_RGBA;
-#endif
-
-#if (OGRE_NO_GLES3_SUPPORT == 0)
-            case PF_FLOAT16_R:
-            case PF_FLOAT32_R:
-            case PF_R8:
-                return GL_RED_EXT;
-            case PF_FLOAT16_GR:
-            case PF_FLOAT32_GR:
-            case PF_RG8:
-                return GL_RG_EXT;
-#else
-            case PF_BYTE_LA:
-            case PF_SHORT_GR:
-                return GL_LUMINANCE_ALPHA;
-#endif
-
-#if (GL_EXT_texture_rg && OGRE_PLATFORM != OGRE_PLATFORM_NACL)
-            case PF_FLOAT16_R:
-            case PF_FLOAT32_R:
-            case PF_R8:
-                return GL_RED_EXT;
-
-            case PF_FLOAT16_GR:
-            case PF_FLOAT32_GR:
-            case PF_RG8:
-                return GL_RG_EXT;
-#endif
-
-            // PVRTC compressed formats
-#if GL_IMG_texture_compression_pvrtc && OGRE_PLATFORM != OGRE_PLATFORM_NACL
-            case PF_PVRTC_RGB2:
-                return GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG;
-            case PF_PVRTC_RGB4:
-                return GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
-            case PF_PVRTC_RGBA2:
-                return GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG;
-            case PF_PVRTC_RGBA4:
-                return GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
-#endif                
-#if GL_IMG_texture_compression_pvrtc2 && OGRE_PLATFORM != OGRE_PLATFORM_NACL
-            case PF_PVRTC2_2BPP:
-                return GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG;
-            case PF_PVRTC2_4BPP:
-                return GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG;
-#endif
-
-#if OGRE_NO_ETC_CODEC == 0 
-#	ifdef GL_OES_compressed_ETC1_RGB8_texture
-            case PF_ETC1_RGB8:
-                return GL_ETC1_RGB8_OES;
-#	endif
-#	ifdef GL_AMD_compressed_ATC_texture
-			case PF_ATC_RGB:
-				return ATC_RGB_AMD;
-			case PF_ATC_RGBA_EXPLICIT_ALPHA:
-				return ATC_RGBA_EXPLICIT_ALPHA_AMD;
-			case PF_ATC_RGBA_INTERPOLATED_ALPHA:
-				return ATC_RGBA_INTERPOLATED_ALPHA_AMD;
-#	endif
-#endif
-
-#ifdef GL_COMPRESSED_RGB8_ETC2
-            case PF_ETC2_RGB8:
-                return GL_COMPRESSED_RGB8_ETC2;
-            case PF_ETC2_RGBA8:
-                return GL_COMPRESSED_RGBA8_ETC2_EAC;
-            case PF_ETC2_RGB8A1:
-                return GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2;
-#endif
-
-            case PF_R5G6B5:
-            case PF_B5G6R5:
-            case PF_R8G8B8:
-            case PF_B8G8R8:
-            case PF_X8B8G8R8:
-            case PF_SHORT_RGB:
-                return GL_RGB;
-
-            case PF_X8R8G8B8:
-			case PF_A8R8G8B8:
-            case PF_A4R4G4B4:
-            case PF_A1R5G5B5:
-            case PF_B8G8R8A8:
-#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
-                return GL_BGRA_EXT;
-#else
-                return GL_RGBA;
-#endif
-
-            case PF_A8B8G8R8:
-			case PF_R8G8B8A8:
-            case PF_A2R10G10B10:
-            case PF_A2B10G10R10:
-            case PF_SHORT_RGBA:
-#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS && OGRE_NO_GLES3_SUPPORT == 1
-                return GL_BGRA_EXT;
-#else
-                return GL_RGBA;
-#endif
-
-            case PF_DXT1:
-#if GL_EXT_texture_compression_dxt1
-                return GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
-#endif
-            case PF_DXT3:
-#if GL_EXT_texture_compression_s3tc
-                return GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
-#endif
-            case PF_DXT5:
-#if GL_EXT_texture_compression_s3tc
-                return GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-#endif
-#if OGRE_NO_GLES3_SUPPORT == 0
-            case PF_L8:
-                return GL_RED;
-            case PF_R8_UINT:
-            case PF_R16_UINT:
-            case PF_R32_UINT:
-            case PF_R8_SINT:
-            case PF_R16_SINT:
-            case PF_R32_SINT:
-				return GL_RED_INTEGER;
-            case PF_R8G8_UINT:
-            case PF_R16G16_UINT:
-            case PF_R32G32_UINT:
-            case PF_R8G8_SINT:
-            case PF_R16G16_SINT:
-            case PF_R32G32_SINT:
-				return GL_RG_INTEGER;
-            case PF_R8G8B8_UINT:
-            case PF_R16G16B16_UINT:
-            case PF_R32G32B32_UINT:
-            case PF_R8G8B8_SINT:
-            case PF_R16G16B16_SINT:
-			case PF_R32G32B32_SINT:
-				return GL_RGB_INTEGER;
-            case PF_R8G8B8A8_UINT:
-            case PF_R16G16B16A16_UINT:
-            case PF_R32G32B32A32_UINT:
-            case PF_R8G8B8A8_SINT:
-            case PF_R16G16B16A16_SINT:
-            case PF_R32G32B32A32_SINT:
-                return GL_RGBA_INTEGER;
-            case PF_R11G11B10_FLOAT:
-            case PF_R9G9B9E5_SHAREDEXP:
-                return GL_RGB;
-            case PF_R8_SNORM:
-                return GL_R8_SNORM;
-            case PF_R8G8_SNORM:
-                return GL_RG8_SNORM;
-            case PF_R8G8B8_SNORM:
-                return GL_RGB8_SNORM;
-            case PF_R8G8B8A8_SNORM:
-                return GL_RGBA8_SNORM;
-#else
-            case PF_L8:
-            case PF_L16:
-                return GL_LUMINANCE;
-#endif
-            default:
-                return 0;
-        }
+        map<PixelFormat, GLenum>::type::iterator it = mGLOriginFormatMap.find(mFormat);
+        if (it == mGLOriginFormatMap.end())
+            return 0;
+        return it->second;
     }
 	//-----------------------------------------------------------------------------
     GLenum GLES2PixelUtil::getGLOriginDataType(PixelFormat mFormat)
     {
-        switch (mFormat)
-        {
-            case PF_DEPTH:
-                return GL_UNSIGNED_INT;
-            case PF_A8:
-            case PF_L8:
-            case PF_L16:
-            case PF_R8G8B8:
-            case PF_B8G8R8:
-            case PF_BYTE_LA:
-                return GL_UNSIGNED_BYTE;
-            case PF_R5G6B5:
-            case PF_B5G6R5:
-                return GL_UNSIGNED_SHORT_5_6_5;
-            case PF_A4R4G4B4:
-            case PF_SHORT_RGB:
-            case PF_SHORT_RGBA:
-				return GL_UNSIGNED_SHORT_4_4_4_4;
-            case PF_A1R5G5B5:
-                return GL_UNSIGNED_SHORT_5_5_5_1;
+        initialize();
 
-#if OGRE_ENDIAN == OGRE_ENDIAN_BIG
-            case PF_X8B8G8R8:
-            case PF_X8R8G8B8:
-            case PF_A8B8G8R8:
-            case PF_A8R8G8B8:
-                return GL_UNSIGNED_INT_8_8_8_8_REV;
-            case PF_B8G8R8A8:
-            case PF_R8G8B8A8:
-                return GL_UNSIGNED_BYTE;
-#else
-            case PF_X8B8G8R8:
-            case PF_A8B8G8R8:
-            case PF_X8R8G8B8:
-            case PF_A8R8G8B8:
-            case PF_B8G8R8A8:
-            case PF_R8G8B8A8:
-                return GL_UNSIGNED_BYTE;
-#endif
-
-            case PF_FLOAT16_R:
-            case PF_FLOAT16_GR:
-            case PF_FLOAT16_RGB:
-            case PF_FLOAT16_RGBA:
-#if (GL_OES_texture_half_float && OGRE_PLATFORM != OGRE_PLATFORM_NACL) || (OGRE_NO_GLES3_SUPPORT == 0)
-                return GL_HALF_FLOAT_OES;
-#else
-                return 0;
-#endif
-#if (GL_EXT_texture_rg && OGRE_PLATFORM != OGRE_PLATFORM_NACL) || (OGRE_NO_GLES3_SUPPORT == 0)
-            case PF_R8:
-            case PF_RG8:
-                return GL_UNSIGNED_BYTE;
-#endif
-            case PF_FLOAT32_R:
-            case PF_FLOAT32_GR:
-            case PF_FLOAT32_RGB:
-            case PF_FLOAT32_RGBA:
-#if (GL_OES_texture_float && OGRE_PLATFORM != OGRE_PLATFORM_NACL) || (OGRE_NO_GLES3_SUPPORT == 0)
-                return GL_FLOAT;
-#endif
-#if OGRE_NO_GLES3_SUPPORT == 0
-            case PF_A2R10G10B10:
-                return GL_UNSIGNED_INT_2_10_10_10_REV;
-            case PF_A2B10G10R10:
-                return GL_UNSIGNED_INT_2_10_10_10_REV;
-            case PF_R8_SNORM:
-            case PF_R8G8_SNORM:
-            case PF_R8G8B8_SNORM:
-            case PF_R8G8B8A8_SNORM:
-            case PF_R16_SNORM:
-            case PF_R16G16_SNORM:
-            case PF_R16G16B16_SNORM:
-            case PF_R16G16B16A16_SNORM:
-            case PF_R8_SINT:
-            case PF_R8G8_SINT:
-            case PF_R8G8B8_SINT:
-            case PF_R8G8B8A8_SINT:
-                return GL_BYTE;
-            case PF_R8_UINT:
-            case PF_R8G8_UINT:
-            case PF_R8G8B8_UINT:
-            case PF_R8G8B8A8_UINT:
-				return GL_UNSIGNED_BYTE;
-            case PF_R32_UINT:
-            case PF_R32G32_UINT:
-            case PF_R32G32B32_UINT:
-            case PF_R32G32B32A32_UINT:
-                return GL_UNSIGNED_INT;
-            case PF_R16_UINT:
-            case PF_R16G16_UINT:
-            case PF_R16G16B16_UINT:
-            case PF_R16G16B16A16_UINT:
-				return GL_UNSIGNED_SHORT;
-            case PF_R16_SINT:
-            case PF_R16G16_SINT:
-            case PF_R16G16B16_SINT:
-            case PF_R16G16B16A16_SINT:
-				return GL_SHORT;
-            case PF_R32G32B32_SINT:
-            case PF_R32_SINT:
-            case PF_R32G32_SINT:
-            case PF_R32G32B32A32_SINT:
-                return GL_INT;
-
-			case PF_R9G9B9E5_SHAREDEXP:
-                return GL_UNSIGNED_INT_5_9_9_9_REV;
-            case PF_R11G11B10_FLOAT:
-                return GL_UNSIGNED_INT_10F_11F_11F_REV;
-#endif
-            default:
-                return 0;
-        }
+        map<PixelFormat, GLenum>::type::iterator it = mGLOriginDataTypeMap.find(mFormat);
+        if (it == mGLOriginDataTypeMap.end())
+            return 0;
+        return it->second;
     }
 
 	//-----------------------------------------------------------------------------
     GLenum GLES2PixelUtil::getGLInternalFormat(PixelFormat fmt, bool hwGamma)
     {
-        switch (fmt)
+        initialize();
+
+        map<PixelFormat, GLenum>::type::iterator it;
+        if (hwGamma)
         {
-            case PF_DEPTH:
-                return GL_DEPTH_COMPONENT;
-#if GL_IMG_texture_compression_pvrtc && OGRE_PLATFORM != OGRE_PLATFORM_NACL
-            case PF_PVRTC_RGB2:
-                return GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG;
-            case PF_PVRTC_RGB4:
-                return GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG;
-            case PF_PVRTC_RGBA2:
-                return GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG;
-            case PF_PVRTC_RGBA4:
-                return GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG;
-#endif
-#if GL_IMG_texture_compression_pvrtc2 && OGRE_PLATFORM != OGRE_PLATFORM_NACL
-            case PF_PVRTC2_2BPP:
-                return GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG;
-            case PF_PVRTC2_4BPP:
-                return GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG;
-#endif
-
-#if OGRE_NO_ETC_CODEC == 0 
-#	ifdef GL_OES_compressed_ETC1_RGB8_texture
-            case PF_ETC1_RGB8:
-                return GL_ETC1_RGB8_OES;
-#	endif
-#	ifdef GL_AMD_compressed_ATC_texture
-			case PF_ATC_RGB:
-				return ATC_RGB_AMD;
-			case PF_ATC_RGBA_EXPLICIT_ALPHA:
-				return ATC_RGBA_EXPLICIT_ALPHA_AMD;
-			case PF_ATC_RGBA_INTERPOLATED_ALPHA:
-				return ATC_RGBA_INTERPOLATED_ALPHA_AMD;
-#	endif
-#endif
-
-#ifdef GL_COMPRESSED_RGB8_ETC2
-            case PF_ETC2_RGB8:
-                return GL_COMPRESSED_RGB8_ETC2;
-            case PF_ETC2_RGBA8:
-                return GL_COMPRESSED_RGBA8_ETC2_EAC;
-            case PF_ETC2_RGB8A1:
-                return GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2;
-#endif
-
-#if OGRE_NO_GLES3_SUPPORT == 0
-			case PF_A1R5G5B5:
-				return GL_RGB5_A1;
-            case PF_R5G6B5:
-			case PF_B5G6R5:
-                return GL_RGB565;
-            case PF_A4R4G4B4:
-                return GL_RGBA4;
-            case PF_R8G8B8:
-            case PF_B8G8R8:
-				if (hwGamma)
-					return GL_SRGB8;
-				else
-					return GL_RGB8;
-            case PF_A8R8G8B8:
-#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
-                return GL_BGRA8_EXT;
-#endif
-            case PF_B8G8R8A8:
-            case PF_A8B8G8R8:
-            case PF_R8G8B8A8:
-			case PF_X8B8G8R8:
-			case PF_X8R8G8B8:
-				if (hwGamma)
-					return GL_SRGB8_ALPHA8;
-				else
-					return GL_RGBA8;
-            case PF_A2R10G10B10:
-            case PF_A2B10G10R10:
-                return GL_RGB10_A2UI;
-            case PF_FLOAT32_RGB:
-                return GL_RGB32F;
-            case PF_FLOAT32_RGBA:
-                return GL_RGBA32F;
-            case PF_FLOAT16_RGBA:
-                return GL_RGBA16F;
-            case PF_FLOAT16_RGB:
-                return GL_RGB16F;
-            case PF_R11G11B10_FLOAT:
-                return GL_R11F_G11F_B10F;
-            case PF_R8_UINT:
-                return GL_R8UI;
-            case PF_R8G8_UINT:
-                return GL_RG8UI;
-            case PF_R8G8B8_UINT:
-                return GL_RGB8UI;
-            case PF_R8G8B8A8_UINT:
-                return GL_RGBA8UI;
-            case PF_R16_UINT:
-                return GL_R16UI;
-            case PF_R16G16_UINT:
-                return GL_RG16UI;
-            case PF_R16G16B16_UINT:
-                return GL_RGB16UI;
-            case PF_R16G16B16A16_UINT:
-                return GL_RGBA16UI;
-            case PF_R32_UINT:
-                return GL_R32UI;
-            case PF_R32G32_UINT:
-                return GL_RG32UI;
-            case PF_R32G32B32_UINT:
-                return GL_RGB32UI;
-            case PF_R32G32B32A32_UINT:
-                return GL_RGBA32UI;
-            case PF_R8_SINT:
-                return GL_R8I;
-            case PF_R8G8_SINT:
-                return GL_RG8I;
-            case PF_R8G8B8_SINT:
-                return GL_RG8I;
-            case PF_R8G8B8A8_SINT:
-                return GL_RGB8I;
-            case PF_R16_SINT:
-                return GL_R16I;
-            case PF_R16G16_SINT:
-                return GL_RG16I;
-            case PF_R16G16B16_SINT:
-                return GL_RGB16I;
-            case PF_R16G16B16A16_SINT:
-                return GL_RGBA16I;
-            case PF_R32_SINT:
-                return GL_R32I;
-            case PF_R32G32_SINT:
-                return GL_RG32I;
-            case PF_R32G32B32_SINT:
-                return GL_RGB32I;
-            case PF_R32G32B32A32_SINT:
-                return GL_RGBA32I;
-            case PF_R9G9B9E5_SHAREDEXP:
-                return GL_RGB9_E5;
-            case PF_R8_SNORM:
-                return GL_R8_SNORM;
-            case PF_R8G8_SNORM:
-                return GL_RG8_SNORM;
-            case PF_R8G8B8_SNORM:
-                return GL_RGB8_SNORM;
-            case PF_R8G8B8A8_SNORM:
-                return GL_RGBA8_SNORM;
-            case PF_L8:
-            case PF_A8:
-                return GL_R8;
-            case PF_L16:
-                return GL_R16F_EXT;
-#else
-            case PF_L8:
-            case PF_L16:
-                return GL_LUMINANCE;
-
-            case PF_A8:
-                return GL_ALPHA;
-
-            case PF_BYTE_LA:
-                return GL_LUMINANCE_ALPHA;
-            case PF_A8R8G8B8:
-            case PF_A8B8G8R8:
-            case PF_B8G8R8A8:
-            case PF_A1R5G5B5:
-            case PF_A4R4G4B4:
-            case PF_X8B8G8R8:
-            case PF_X8R8G8B8:
-            case PF_SHORT_RGBA:
-                return GL_RGBA;
-            case PF_FLOAT16_RGB:
-            case PF_FLOAT32_RGB:
-            case PF_R5G6B5:
-            case PF_B5G6R5:
-            case PF_R8G8B8:
-            case PF_B8G8R8:
-            case PF_SHORT_RGB:
-                return GL_RGB;
-            case PF_FLOAT32_RGBA:
-            case PF_A2R10G10B10:
-            case PF_A2B10G10R10:
-#endif
-
-            case PF_A4L4:
-            case PF_R3G3B2:
-            case PF_SHORT_GR:
-			case PF_DXT1:
-#if GL_EXT_texture_compression_dxt1
-				if (!hwGamma)
-					return GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
-				return GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
-#endif
-            case PF_DXT3:
-#if GL_EXT_texture_compression_s3tc
-				if (!hwGamma)
-	                return GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
-                return GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
-#endif
-            case PF_DXT5:
-#if GL_EXT_texture_compression_s3tc
-				if (!hwGamma)
-	                return GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-                return GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-#endif
-                
-#if (GL_EXT_texture_rg && OGRE_PLATFORM != OGRE_PLATFORM_NACL) || (OGRE_NO_GLES3_SUPPORT == 0)
-            case PF_FLOAT16_R:
-                return GL_R16F_EXT;
-            case PF_FLOAT32_R:
-                return GL_R32F_EXT;
-            case PF_R8:
-                return GL_RED_EXT;
-            case PF_FLOAT16_GR:
-                return GL_RG16F_EXT;
-            case PF_FLOAT32_GR:
-                return GL_RG32F_EXT;
-            case PF_RG8:
-                return GL_RG_EXT;
-#endif
-            default:
-                return GL_NONE;
+            it = mGLHwGammaInternalFormatMap.find(fmt);
+            if (it != mGLHwGammaInternalFormatMap.end())
+                return it->second;
         }
+        it = mGLInternalFormatMap.find(fmt);
+        if (it != mGLInternalFormatMap.end())
+            return it->second;
+        return GL_NONE;
     }
 	//-----------------------------------------------------------------------------
     GLenum GLES2PixelUtil::getClosestGLInternalFormat(PixelFormat mFormat,
                                                    bool hwGamma)
     {
+        initialize();
+
         GLenum format = getGLInternalFormat(mFormat, hwGamma);
         if (format == GL_NONE)
         {
 #if OGRE_NO_GLES3_SUPPORT == 0
-            if (hwGamma)
-                return GL_SRGB8;
-            else
-#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
-                return GL_BGRA8_EXT;
-#else
-                return GL_RGBA8;
+            if (gleswIsSupported(3, 0))
+            {
+                if (hwGamma)
+                    return GL_SRGB8;
+                else
+                    return GL_RGBA8;
+            }
 #endif
-#else
             if (hwGamma)
             {
                 // TODO not supported
@@ -599,9 +720,8 @@ namespace Ogre {
             }
             else
             {
-                return GL_RGBA8_OES;
+                return GL_RGBA;
             }
-#endif
         }
         else
         {
@@ -611,212 +731,18 @@ namespace Ogre {
 	//-----------------------------------------------------------------------------
     PixelFormat GLES2PixelUtil::getClosestOGREFormat(GLenum fmt, GLenum dataType)
     {
-        switch (fmt)
+        initialize();
+
+        map<std::pair<GLenum, GLenum>, PixelFormat>::type::iterator it =
+            mClosestOgreFormat.find(std::pair<GLenum, GLenum>(fmt, dataType));
+        if (it == mClosestOgreFormat.end())
+            it = mClosestOgreFormat.find(std::pair<GLenum, GLenum>(fmt, 0));
+        if (it == mClosestOgreFormat.end())
         {
-            case GL_DEPTH_COMPONENT:
-            case GL_DEPTH24_STENCIL8_OES:
-            case GL_DEPTH_COMPONENT16:
-            case GL_DEPTH_COMPONENT24_OES:
-            case GL_DEPTH_COMPONENT32_OES:
-                return PF_DEPTH;
-
-#if GL_IMG_texture_compression_pvrtc
-            case GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG:
-                return PF_PVRTC_RGB2;
-            case GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG:
-                return PF_PVRTC_RGBA2;
-            case GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG:
-                return PF_PVRTC_RGB4;
-            case GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG:
-                return PF_PVRTC_RGBA4;
-#endif
-
-#if GL_IMG_texture_compression_pvrtc2
-            case GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG:
-                return PF_PVRTC2_2BPP;
-            case GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG:
-                return PF_PVRTC2_4BPP;
-#endif
-
-#if OGRE_NO_ETC_CODEC == 0 
-#	ifdef GL_OES_compressed_ETC1_RGB8_texture
-            case GL_ETC1_RGB8_OES:
-                return PF_ETC1_RGB8;
-#	endif
-#	ifdef GL_AMD_compressed_ATC_texture
-			case ATC_RGB_AMD:
-				return PF_ATC_RGB;
-			case ATC_RGBA_EXPLICIT_ALPHA_AMD:
-				return PF_ATC_RGBA_EXPLICIT_ALPHA;
-			case ATC_RGBA_INTERPOLATED_ALPHA_AMD:
-				return PF_ATC_RGBA_INTERPOLATED_ALPHA;
-#	endif
-#endif
-
-#ifdef GL_COMPRESSED_RGB8_ETC2
-            case GL_COMPRESSED_RGB8_ETC2:
-                return PF_ETC2_RGB8;
-            case GL_COMPRESSED_RGBA8_ETC2_EAC:
-                return PF_ETC2_RGBA8;
-            case GL_COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2:
-                return PF_ETC2_RGB8A1;
-#endif
-
-            case GL_LUMINANCE:
-                return PF_L8;
-            case GL_ALPHA:
-                return PF_A8;
-            case GL_LUMINANCE_ALPHA:
-                return PF_BYTE_LA;
-                
-            case GL_RGB:
-            case GL_RGB8_OES:
-                switch(dataType)
-                {
-                    case GL_UNSIGNED_SHORT_5_6_5:
-                        return PF_B5G6R5;
-                    case GL_HALF_FLOAT_OES:
-                        return PF_FLOAT16_RGB;
-                    case GL_FLOAT:
-                        return PF_FLOAT32_RGB;
-                    default:
-                        return PF_R8G8B8;
-                }
-            case GL_RGBA:
-            case GL_RGBA8_OES:
-                switch(dataType)
-                {
-                    case GL_UNSIGNED_SHORT_5_5_5_1:
-                        return PF_A1R5G5B5;
-                    case GL_UNSIGNED_SHORT_4_4_4_4:
-                        return PF_A4R4G4B4;
-                    case GL_HALF_FLOAT_OES:
-                        return PF_FLOAT16_RGBA;
-                    case GL_FLOAT:
-                        return PF_FLOAT32_RGBA;
-                    default:
-                        return PF_A8B8G8R8;
-                }
-#if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
-            case GL_BGRA8_EXT:
-            case GL_BGRA_EXT:
-                return PF_A8R8G8B8;
-#endif
-
-#if GL_EXT_texture_compression_dxt1
-            case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
-            case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
-                return PF_DXT1;
-#endif
-#if GL_EXT_texture_compression_s3tc
-            case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
-                return PF_DXT3;
-            case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
-                return PF_DXT5;
-#endif
-                
-#if (GL_EXT_texture_rg && OGRE_PLATFORM != OGRE_PLATFORM_NACL) || (OGRE_NO_GLES3_SUPPORT == 0)
-            case GL_R8_EXT:
-                return PF_R8;
-            case GL_RG8_EXT:
-                return PF_RG8;
-#endif
-#if OGRE_NO_GLES3_SUPPORT == 0
-            case GL_RGB10_A2:
-            case GL_RGB10_A2UI:
-                return PF_A2R10G10B10;
-            case GL_R11F_G11F_B10F:
-                return PF_R11G11B10_FLOAT;
-            case GL_R8UI:
-                return PF_R8_UINT;
-            case GL_RG8UI:
-                return PF_R8G8_UINT;
-            case GL_RGB8UI:
-                return PF_R8G8B8_UINT;
-            case GL_RGBA8UI:
-                return PF_R8G8B8A8_UINT;
-            case GL_R16UI:
-                return PF_R16_UINT;
-            case GL_RG16UI:
-                return PF_R16G16_UINT;
-            case GL_RGB16UI:
-                return PF_R16G16B16_UINT;
-            case GL_RGBA16UI:
-                return PF_R16G16B16A16_UINT;
-            case GL_R32UI:
-                return PF_R32_UINT;
-            case GL_RG32UI:
-                return PF_R32G32_UINT;
-            case GL_RGB32UI:
-                return PF_R32G32B32_UINT;
-            case GL_RGBA32UI:
-                return PF_R32G32B32A32_UINT;
-            case GL_R8I:
-                return PF_R8_SINT;
-            case GL_RG8I:
-                return PF_R8G8_SINT;
-            case GL_RGB8I:
-                return PF_R8G8B8_SINT;
-            case GL_RGBA8I:
-                return PF_R8G8B8A8_SINT;
-            case GL_R16I:
-                return PF_R16_SINT;
-            case GL_RG16I:
-                return PF_R16G16_SINT;
-            case GL_RGB16I:
-                return PF_R16G16B16_SINT;
-            case GL_RGBA16I:
-                return PF_R16G16B16A16_SINT;
-            case GL_R32I:
-                return PF_R32_SINT;
-            case GL_RG32I:
-                return PF_R32G32_SINT;
-            case GL_RGB32I:
-                return PF_R32G32B32_SINT;
-            case GL_RGBA32I:
-                return PF_R32G32B32A32_SINT;
-            case GL_RGB9_E5:
-                return PF_R9G9B9E5_SHAREDEXP;
-            case GL_R8_SNORM:
-                return PF_R8_SNORM;
-            case GL_RG8_SNORM:
-                return PF_R8G8_SNORM;
-            case GL_RGB8_SNORM:
-                return PF_R8G8B8_SNORM;
-            case GL_RGBA8_SNORM:
-                return PF_R8G8B8A8_SNORM;
-            case GL_SRGB8:
-                return PF_X8R8G8B8;
-            case GL_SRGB8_ALPHA8:
-                return PF_A8R8G8B8;
-#endif
-
-#if GL_EXT_color_buffer_half_float || (OGRE_NO_GLES3_SUPPORT == 0)
-            case GL_RGBA16F_EXT:
-                return PF_FLOAT16_RGBA;
-            case GL_RGB16F_EXT:
-                return PF_FLOAT16_RGB;
-            case GL_RG16F_EXT:
-                return PF_FLOAT16_GR;
-            case GL_R16F_EXT:
-                return PF_FLOAT16_R;
-#endif
-
-#if GL_EXT_color_buffer_float || (OGRE_NO_GLES3_SUPPORT == 0)
-            case GL_RGBA32F_EXT:
-                return PF_FLOAT32_RGBA;
-            case GL_RGB32F_EXT:
-                return PF_FLOAT32_RGB;
-            case GL_RG32F_EXT:
-                return PF_FLOAT32_GR;
-            case GL_R32F_EXT:
-                return PF_FLOAT32_R;
-#endif
-
-            default:
-                LogManager::getSingleton().logMessage("Unhandled Pixel format: " + StringConverter::toString(fmt));
-                return PF_A8B8G8R8;
-        };
+            LogManager::getSingleton().logMessage("Unhandled Pixel format: " + StringConverter::toString(fmt));
+            return PF_A8B8G8R8;
+        }
+        return it->second;
     }
 	//-----------------------------------------------------------------------------
     size_t GLES2PixelUtil::getMaxMipmaps(uint32 width, uint32 height, uint32 depth,

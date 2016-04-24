@@ -111,19 +111,15 @@ namespace Ogre {
     static const GLenum stencilFormats[] =
     {
         GL_NONE,                    // No stencil
-#if OGRE_NO_GLES3_SUPPORT == 1
         GL_STENCIL_INDEX1_OES,
         GL_STENCIL_INDEX4_OES,
-#endif
         GL_STENCIL_INDEX8
     };
     static const size_t stencilBits[] =
     {
         0,
-#if OGRE_NO_GLES3_SUPPORT == 1
         1,
         4,
-#endif
         8
     };
     #define STENCILFORMAT_COUNT (sizeof(stencilFormats)/sizeof(GLenum))
@@ -131,26 +127,22 @@ namespace Ogre {
     static const GLenum depthFormats[] =
     {
         GL_NONE,
-        GL_DEPTH_COMPONENT16
-        , GL_DEPTH_COMPONENT24_OES   // Prefer 24 bit depth
-        , GL_DEPTH_COMPONENT32_OES
-        , GL_DEPTH24_STENCIL8_OES    // Packed depth / stencil
-#if OGRE_NO_GLES3_SUPPORT == 0
-        , GL_DEPTH32F_STENCIL8
-#endif
-        , GL_DEPTH_COMPONENT
+        GL_DEPTH_COMPONENT16,
+        GL_DEPTH_COMPONENT24_OES,   // Prefer 24 bit depth
+        GL_DEPTH_COMPONENT32_OES,
+        GL_DEPTH24_STENCIL8_OES,    // Packed depth / stencil
+        GL_DEPTH32F_STENCIL8,
+        GL_DEPTH_COMPONENT
     };
     static const size_t depthBits[] =
     {
-        0
-        ,16
-        ,24
-        ,32
-        ,24
-#if OGRE_NO_GLES3_SUPPORT == 0
-        ,32
-#endif
-        ,32
+        0,
+        16,
+        24,
+        32,
+        24,
+        32,
+        32
     };
     #define DEPTHFORMAT_COUNT (sizeof(depthFormats)/sizeof(GLenum))
 
@@ -199,16 +191,23 @@ namespace Ogre {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-#if OGRE_NO_GLES3_SUPPORT == 0
-            unsigned char data[PROBE_SIZE * PROBE_SIZE * PixelUtil::getNumElemBytes(pixFmt)];
 
-            glTexStorage2D(GL_TEXTURE_2D, 1, internalFormat, PROBE_SIZE, PROBE_SIZE);
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, PROBE_SIZE, PROBE_SIZE, fmt, GL_UNSIGNED_BYTE, data);
-#else
-            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, PROBE_SIZE, PROBE_SIZE, 0, fmt, type, 0);
+#if OGRE_NO_GLES3_SUPPORT == 0
+            if (gleswIsSupported(3, 0))
+            {
+                unsigned char data[PROBE_SIZE * PROBE_SIZE * PixelUtil::getNumElemBytes(pixFmt)];
+
+                glTexStorage2D(GL_TEXTURE_2D, 1, internalFormat, PROBE_SIZE, PROBE_SIZE);
+                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, PROBE_SIZE, PROBE_SIZE, fmt, GL_UNSIGNED_BYTE, data);
+            }
+            else
 #endif
+            {
+                glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, PROBE_SIZE, PROBE_SIZE, 0, fmt, type, 0);
+            }
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                                    GL_TEXTURE_2D, tid, 0);
+
         }
     }
 
@@ -341,6 +340,7 @@ namespace Ogre {
     */
     void GLES2FBOManager::detectFBOFormats()
     {
+        bool packedDepthStencilSupported = getGLES2SupportRef()->checkExtension("GL_OES_packed_depth_stencil") || gleswIsSupported(3, 0);
         // Try all formats, and report which ones work as target
         GLuint fb = 0, tid = 0;
 
@@ -380,19 +380,20 @@ namespace Ogre {
                 // For each depth/stencil formats
                 for (size_t depth = 0; depth < DEPTHFORMAT_COUNT; ++depth)
                 {
-#if OGRE_NO_GLES3_SUPPORT == 1
-                    if ((getGLES2SupportRef()->checkExtension("GL_OES_packed_depth_stencil") &&
-                         depthFormats[depth] != GL_DEPTH24_STENCIL8_OES) ||
+                    if ((packedDepthStencilSupported &&
+                         depthFormats[depth] != GL_DEPTH24_STENCIL8_OES &&
+                         depthFormats[depth] != GL_DEPTH32F_STENCIL8) ||
                         depthFormats[depth] == GL_DEPTH_COMPONENT)
-#else
-                    if (depthFormats[depth] != GL_DEPTH24_STENCIL8 && depthFormats[depth] != GL_DEPTH32F_STENCIL8 &&
-                        depthFormats[depth] != GL_DEPTH_COMPONENT)
-#endif
                     {
                         // General depth/stencil combination
 
                         for (size_t stencil = 0; stencil < STENCILFORMAT_COUNT; ++stencil)
                         {
+                            if (gleswIsSupported(3, 0) &&
+                                (stencilFormats[stencil] == GL_STENCIL_INDEX1_OES ||
+                                 stencilFormats[stencil] == GL_STENCIL_INDEX4_OES))
+                                continue;
+
 //                            StringUtil::StrStreamType l;
 //                            l << "Trying " << PixelUtil::getFormatName((PixelFormat)x) 
 //                            	<< " D" << depthBits[depth] 
@@ -492,12 +493,12 @@ namespace Ogre {
             if(depthBits[props.modes[mode].depth]==24) // Prefer 24 bit for now
                 desirability += 500;
             if (getGLES2SupportRef()->checkExtension("GL_OES_packed_depth_stencil") || gleswIsSupported(3, 0))
+            {
                 if(depthFormats[props.modes[mode].depth] == GL_DEPTH24_STENCIL8_OES) // Prefer 24/8 packed
                     desirability += 5000;
-#if OGRE_NO_GLES3_SUPPORT == 0
-			if(depthFormats[props.modes[mode].depth] == GL_DEPTH32F_STENCIL8) // Prefer 32F/8 packed
-				desirability += 5000;
-#endif
+                if(depthFormats[props.modes[mode].depth] == GL_DEPTH32F_STENCIL8) // Prefer 32F/8 packed
+                    desirability += 5000;
+            }
             desirability += stencilBits[props.modes[mode].stencil] + depthBits[props.modes[mode].depth];
             
             if(desirability > bestscore)

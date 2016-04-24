@@ -127,6 +127,19 @@ namespace Ogre {
 #endif
                 
         protected:
+            /// Upload a box of pixels to this buffer on the card for OpenGLES 3
+            void uploadGLES3Impl(const PixelBox &data, const Image::Box &dest);
+            
+            /// Download a box of pixels from the card  for OpenGLES 3
+            void downloadGLES3Impl(const PixelBox &data);
+
+            /// Upload a box of pixels to this buffer on the card for OpenGLES 2
+            void uploadGLES2Impl(const PixelBox &data, const Image::Box &dest);
+            
+            /// Download a box of pixels from the card  for OpenGLES 2
+            void downloadGLES2Impl(const PixelBox &data);
+
+        protected:
             // In case this is a texture level
             GLenum mTarget;
             GLenum mFaceTarget; // same as mTarget in case of GL_TEXTURE_xD, but cubemap face for cubemaps

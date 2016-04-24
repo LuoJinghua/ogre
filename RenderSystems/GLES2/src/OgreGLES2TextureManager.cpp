@@ -96,7 +96,8 @@ namespace Ogre {
             !caps->hasCapability(RSC_TEXTURE_COMPRESSION_DXT) && 
 			!caps->hasCapability(RSC_TEXTURE_COMPRESSION_PVRTC) && 
 			!caps->hasCapability(RSC_TEXTURE_COMPRESSION_ATC) && 
-			!caps->hasCapability(RSC_TEXTURE_COMPRESSION_ETC1))
+			!caps->hasCapability(RSC_TEXTURE_COMPRESSION_ETC1) &&
+            !caps->hasCapability(RSC_TEXTURE_COMPRESSION_ETC2))
         {
             return PF_A8R8G8B8;
         }

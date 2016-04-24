@@ -63,6 +63,20 @@ namespace Ogre {
             mContext = [[EAGLContext alloc] initWithAPI:renderingAPI];
         }
 
+        if (!mContext && renderingAPI == kEAGLRenderingAPIOpenGLES3)
+        {
+            renderingAPI = kEAGLRenderingAPIOpenGLES2;
+
+            if(group)
+            {
+                mContext = [[EAGLContext alloc] initWithAPI:renderingAPI sharegroup:group];
+            }
+            else
+            {
+                mContext = [[EAGLContext alloc] initWithAPI:renderingAPI];
+            }
+        }
+
         if (!mContext || ![EAGLContext setCurrentContext:mContext])
         {
             OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
@@ -130,8 +144,8 @@ namespace Ogre {
         OGRE_CHECK_GL_ERROR(glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_HEIGHT, &mBackingHeight));
         OGRE_CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, mViewRenderbuffer));
 
-#if GL_APPLE_framebuffer_multisample || OGRE_NO_GLES3_SUPPORT == 0
-        if(mIsMultiSampleSupported && mNumSamples > 0)
+#if GL_APPLE_framebuffer_multisample
+        if (mIsMultiSampleSupported && mNumSamples > 0)
         {
             // Determine how many MSAA samples to use
             GLint maxSamplesAllowed;

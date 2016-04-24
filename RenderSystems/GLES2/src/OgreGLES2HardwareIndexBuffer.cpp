@@ -105,12 +105,14 @@ namespace Ogre {
     {
         static_cast<GLES2HardwareBufferManagerBase*>(mMgr)->getStateCacheManager()->bindGLBuffer(GL_ELEMENT_ARRAY_BUFFER, mBufferId);
 
-#if OGRE_NO_GLES3_SUPPORT == 0 || defined(GL_EXT_map_buffer_range)
-        if (glFlushMappedBufferRangeEXT && mUsage & HBU_WRITE_ONLY)
+        if ((getGLES2SupportRef()->checkExtension("GL_EXT_map_buffer_range") || gleswIsSupported(3, 0)))
         {
-            OGRE_CHECK_GL_ERROR(glFlushMappedBufferRangeEXT(GL_ELEMENT_ARRAY_BUFFER, mLockStart, mLockSize));
+            if (glFlushMappedBufferRangeEXT && mUsage & HBU_WRITE_ONLY)
+            {
+                OGRE_CHECK_GL_ERROR(glFlushMappedBufferRangeEXT(GL_ELEMENT_ARRAY_BUFFER, mLockStart, mLockSize));
+            }
         }
-#endif
+
         GLboolean mapped;
         OGRE_CHECK_GL_ERROR(mapped = glUnmapBufferOES(GL_ELEMENT_ARRAY_BUFFER));
         if(!mapped)
@@ -138,8 +140,8 @@ namespace Ogre {
         static_cast<GLES2HardwareBufferManagerBase*>(mMgr)->getStateCacheManager()->bindGLBuffer(GL_ELEMENT_ARRAY_BUFFER, mBufferId);
 
         void* pBuffer;
-#if OGRE_NO_GLES3_SUPPORT == 0 || defined(GL_EXT_map_buffer_range)
-        if (glMapBufferRangeEXT)
+        if (glMapBufferRangeEXT &&
+            (getGLES2SupportRef()->checkExtension("GL_EXT_map_buffer_range") || gleswIsSupported(3, 0)))
         {
             if (mUsage & HBU_WRITE_ONLY)
             {
@@ -159,7 +161,6 @@ namespace Ogre {
             OGRE_CHECK_GL_ERROR(pBuffer = glMapBufferRangeEXT(GL_ELEMENT_ARRAY_BUFFER, offset, length, access));
         }
         else
-#endif
         {
             // Use glMapBuffer
             if(options == HBL_DISCARD || options == HBL_NO_OVERWRITE)
@@ -263,20 +264,25 @@ namespace Ogre {
     void GLES2HardwareIndexBuffer::copyData(HardwareBuffer& srcBuffer, size_t srcOffset,
                                               size_t dstOffset, size_t length, bool discardWholeBuffer)
     {
+        if (!gleswIsSupported(3, 0))
+        {
+            HardwareBuffer::copyData(srcBuffer, srcOffset, dstOffset, length, discardWholeBuffer);
+            return;
+        }
+
         // If the buffer is not in system memory we can use ARB_copy_buffers to do an optimised copy.
-        if (srcBuffer.isSystemMemory())
+        if (srcBuffer.isSystemMemory() || hasShadowBuffer())
         {
 			HardwareBuffer::copyData(srcBuffer, srcOffset, dstOffset, length, discardWholeBuffer);
         }
         else
         {
-            // Unbind the current buffer
-            OGRE_CHECK_GL_ERROR(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+            // Zero out this(destination) buffer
+            static_cast<GLES2HardwareBufferManagerBase*>(mMgr)->getStateCacheManager()->bindGLBuffer(GL_ELEMENT_ARRAY_BUFFER, mBufferId);
 
             // Zero out this(destination) buffer
-            OGRE_CHECK_GL_ERROR(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mBufferId));
-            OGRE_CHECK_GL_ERROR(glBufferData(GL_ELEMENT_ARRAY_BUFFER, length, 0, GLES2HardwareBufferManager::getGLUsage(mUsage)));
-            OGRE_CHECK_GL_ERROR(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+            if (discardWholeBuffer)
+                OGRE_CHECK_GL_ERROR(glBufferData(GL_ELEMENT_ARRAY_BUFFER, mSizeInBytes, 0, GLES2HardwareBufferManager::getGLUsage(mUsage)));
 
             // Do it the fast way.
             OGRE_CHECK_GL_ERROR(glBindBuffer(GL_COPY_READ_BUFFER, static_cast<GLES2HardwareIndexBuffer &>(srcBuffer).getGLBufferId()));

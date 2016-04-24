@@ -49,6 +49,7 @@ THE SOFTWARE.
 #include "OgreGLSLESProgramPipeline.h"
 #include "OgreGLES2StateCacheManager.h"
 #include "OgreGLES2VertexDeclaration.h"
+#include "OgreGLES2PixelFormat.h"
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
 #   include "OgreEAGL2Window.h"
@@ -83,9 +84,7 @@ namespace Ogre {
 		LogManager::getSingleton().logMessage(getName() + " created.");
 
         mRenderAttribsBound.reserve(100);
-#if OGRE_NO_GLES3_SUPPORT == 0
         mRenderInstanceAttribsBound.reserve(100);
-#endif
 
 		mEnableFixedPipeline = false;
 
@@ -148,6 +147,7 @@ namespace Ogre {
 			mResourceManager = NULL;
 		}
 #endif
+        GLES2PixelUtil::reset();
     }
 
     const String& GLES2RenderSystem::getName(void) const
@@ -304,16 +304,22 @@ namespace Ogre {
 
         rsc->setCapability(RSC_FBO);
         rsc->setCapability(RSC_HWRENDER_TO_TEXTURE);
+
 #if OGRE_NO_GLES3_SUPPORT == 0
-        // Probe number of draw buffers
-        // Only makes sense with FBO support, so probe here
-        GLint buffers;
-        glGetIntegerv(GL_MAX_DRAW_BUFFERS, &buffers);
-        rsc->setNumMultiRenderTargets(std::min<int>(buffers, (GLint)OGRE_MAX_MULTIPLE_RENDER_TARGETS));
-        rsc->setCapability(RSC_MRT_DIFFERENT_BIT_DEPTHS);
-#else
-        rsc->setNumMultiRenderTargets(1);
+        if (gleswIsSupported(3, 0))
+        {
+            // Probe number of draw buffers
+            // Only makes sense with FBO support, so probe here
+            GLint buffers;
+            glGetIntegerv(GL_MAX_DRAW_BUFFERS, &buffers);
+            rsc->setNumMultiRenderTargets(std::min<int>(buffers, (GLint)OGRE_MAX_MULTIPLE_RENDER_TARGETS));
+            rsc->setCapability(RSC_MRT_DIFFERENT_BIT_DEPTHS);
+        }
+        else
 #endif
+        {
+            rsc->setNumMultiRenderTargets(1);
+        }
 
         // Cube map
         rsc->setCapability(RSC_CUBEMAPPING);
@@ -383,10 +389,12 @@ namespace Ogre {
 
         GLfloat floatConstantCount = 0;
 #if OGRE_NO_GLES3_SUPPORT == 0
-        glGetFloatv(GL_MAX_VERTEX_UNIFORM_COMPONENTS, &floatConstantCount);
-#else
-        glGetFloatv(GL_MAX_VERTEX_UNIFORM_VECTORS, &floatConstantCount);
+        if (gleswIsSupported(3, 0))
+            glGetFloatv(GL_MAX_VERTEX_UNIFORM_COMPONENTS, &floatConstantCount);
+        else
 #endif
+            glGetFloatv(GL_MAX_VERTEX_UNIFORM_VECTORS, &floatConstantCount);
+
         rsc->setVertexProgramConstantFloatCount((Ogre::ushort)floatConstantCount);
         rsc->setVertexProgramConstantBoolCount((Ogre::ushort)floatConstantCount);
         rsc->setVertexProgramConstantIntCount((Ogre::ushort)floatConstantCount);
@@ -394,10 +402,12 @@ namespace Ogre {
         // Fragment Program Properties
         floatConstantCount = 0;
 #if OGRE_NO_GLES3_SUPPORT == 0
-        glGetFloatv(GL_MAX_FRAGMENT_UNIFORM_COMPONENTS, &floatConstantCount);
-#else
-        glGetFloatv(GL_MAX_FRAGMENT_UNIFORM_VECTORS, &floatConstantCount);
+        if (gleswIsSupported(3, 0))
+            glGetFloatv(GL_MAX_FRAGMENT_UNIFORM_COMPONENTS, &floatConstantCount);
+        else
 #endif
+            glGetFloatv(GL_MAX_FRAGMENT_UNIFORM_VECTORS, &floatConstantCount);
+
         rsc->setFragmentProgramConstantFloatCount((Ogre::ushort)floatConstantCount);
         rsc->setFragmentProgramConstantBoolCount((Ogre::ushort)floatConstantCount);
         rsc->setFragmentProgramConstantIntCount((Ogre::ushort)floatConstantCount);
@@ -408,7 +418,8 @@ namespace Ogre {
 
 		rsc->setCapability(RSC_TEXTURE_1D);
 #if OGRE_NO_GLES3_SUPPORT == 0
-        rsc->setCapability(RSC_TEXTURE_3D);
+        if (gleswIsSupported(3, 0))
+            rsc->setCapability(RSC_TEXTURE_3D);
 #endif
 
         // ES 3 always supports NPOT textures
@@ -433,17 +444,15 @@ namespace Ogre {
            (mGLSupport->checkExtension("GL_OES_vertex_array_object") || gleswIsSupported(3, 0)))
             rsc->setCapability(RSC_VAO);
 
-#if OGRE_NO_GLES3_SUPPORT == 0
 		if (mGLSupport->checkExtension("GL_OES_get_program_binary") || gleswIsSupported(3, 0))
 		{
 			// http://www.khronos.org/registry/gles/extensions/OES/OES_get_program_binary.txt
             GLint formats;
-            OGRE_CHECK_GL_ERROR(glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &formats));
+            OGRE_CHECK_GL_ERROR(glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS_OES, &formats));
 
             if(formats > 0)
                 rsc->setCapability(RSC_CAN_GET_COMPILED_SHADER_BUFFER);
 		}
-#endif
 
         if (mGLSupport->checkExtension("GL_EXT_instanced_arrays") || gleswIsSupported(3, 0))
         {
@@ -452,7 +461,8 @@ namespace Ogre {
 
 #if OGRE_NO_GLES3_SUPPORT == 0
 		// Check if render to vertex buffer (transform feedback in OpenGL)
-        rsc->setCapability(RSC_HWRENDER_TO_VERTEX_BUFFER);
+        if (gleswIsSupported(3, 0))
+            rsc->setCapability(RSC_HWRENDER_TO_VERTEX_BUFFER);
 #endif
         return rsc;
     }
@@ -689,12 +699,9 @@ namespace Ogre {
 																fbo->getHeight(), fbo->getFSAA() );
 
 			GLES2RenderBuffer *stencilBuffer = depthBuffer;
-			if( 
-#if OGRE_NO_GLES3_SUPPORT == 0
-               depthFormat != GL_DEPTH32F_STENCIL8 &&
-#endif
-               depthFormat != GL_DEPTH24_STENCIL8_OES &&
-               stencilFormat )
+			if (depthFormat != GL_DEPTH32F_STENCIL8 &&
+                depthFormat != GL_DEPTH24_STENCIL8_OES &&
+                stencilFormat )
 			{
                 stencilBuffer = OGRE_NEW GLES2RenderBuffer( stencilFormat, fbo->getWidth(),
                                                            fbo->getHeight(), fbo->getFSAA() );
@@ -884,7 +891,8 @@ namespace Ogre {
         mSamplerStates[stage].setTexParameteri(GL_TEXTURE_WRAP_S, getTextureAddressingMode(uvw.u));
         mSamplerStates[stage].setTexParameteri(GL_TEXTURE_WRAP_T, getTextureAddressingMode(uvw.v));
 #if OGRE_NO_GLES3_SUPPORT == 0
-        mSamplerStates[stage].setTexParameteri(GL_TEXTURE_WRAP_R, getTextureAddressingMode(uvw.w));
+        if (gleswIsSupported(3, 0))
+            mSamplerStates[stage].setTexParameteri(GL_TEXTURE_WRAP_R, getTextureAddressingMode(uvw.w));
 #endif
     }
 
@@ -1771,11 +1779,16 @@ namespace Ogre {
                 else
                 {
 #if OGRE_NO_GLES3_SUPPORT == 0
-                    GLuint indexEnd = op.indexData->indexCount - op.indexData->indexStart;
-                    OGRE_CHECK_GL_ERROR(glDrawRangeElements((polyMode == GL_FILL) ? primType : polyMode, op.indexData->indexStart, indexEnd, static_cast<GLsizei>(op.indexData->indexCount), indexType, pBufferData));
-#else
-                    OGRE_CHECK_GL_ERROR(glDrawElements((polyMode == GL_FILL) ? primType : polyMode, static_cast<GLsizei>(op.indexData->indexCount), indexType, pBufferData));
+                    if (gleswIsSupported(3, 0))
+                    {
+                        GLuint indexEnd = op.indexData->indexCount - op.indexData->indexStart;
+                        OGRE_CHECK_GL_ERROR(glDrawRangeElements((polyMode == GL_FILL) ? primType : polyMode, op.indexData->indexStart, indexEnd, static_cast<GLsizei>(op.indexData->indexCount), indexType, pBufferData));
+                    }
+                    else
 #endif
+                    {
+                        OGRE_CHECK_GL_ERROR(glDrawElements((polyMode == GL_FILL) ? primType : polyMode, static_cast<GLsizei>(op.indexData->indexCount), indexType, pBufferData));
+                    }
                 }
 
             } while (updatePassIterationRenderState());
@@ -2026,7 +2039,8 @@ namespace Ogre {
 
 #if OGRE_NO_GLES3_SUPPORT == 0
 		// Enable primitive restarting with fixed indices depending upon the data type
-		OGRE_CHECK_GL_ERROR(glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX));
+        if (gleswIsSupported(3, 0))
+            OGRE_CHECK_GL_ERROR(glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX));
 #endif
     }
 

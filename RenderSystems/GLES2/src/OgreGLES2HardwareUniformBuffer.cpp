@@ -185,7 +185,7 @@ namespace Ogre {
                                                 size_t dstOffset, size_t length, bool discardWholeBuffer)
     {
         // If the buffer is not in system memory we can use ARB_copy_buffers to do an optimised copy.
-        if (srcBuffer.isSystemMemory())
+        if (srcBuffer.isSystemMemory() || hasShadowBuffer())
         {
 			HardwareBuffer::copyData(srcBuffer, srcOffset, dstOffset, length, discardWholeBuffer);
         }

@@ -315,6 +315,11 @@ typedef void (GL_APIENTRY* PFNGLPROGRAMUNIFORMMATRIX4X3FVEXTPROC) (GLuint progra
 typedef void (GL_APIENTRY* PFNGLVALIDATEPROGRAMPIPELINEEXTPROC) (GLuint pipeline);
 typedef void (GL_APIENTRY* PFNGLGETPROGRAMPIPELINEINFOLOGEXTPROC) (GLuint pipeline, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
 
+typedef void (GL_APIENTRY* PFNGLDISCARDFRAMEBUFFEREXTPROC) (GLenum target, GLsizei numAttachments, const GLenum *attachments);
+typedef void (GL_APIENTRYP PFNGLRENDERBUFFERSTORAGEMULTISAMPLEAPPLEPROC) (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
+typedef void (GL_APIENTRYP PFNGLRESOLVEMULTISAMPLEFRAMEBUFFERAPPLEPROC) (void);
+typedef void* (GL_APIENTRY* PFNGLMAPBUFFEROESPROC) (GLenum target, GLenum access);
+
 extern PFNGLACTIVETEXTUREPROC gleswActiveTexture;
 extern PFNGLATTACHSHADERPROC gleswAttachShader;
 extern PFNGLBINDATTRIBLOCATIONPROC gleswBindAttribLocation;
@@ -603,6 +608,11 @@ extern PFNGLPROGRAMUNIFORMMATRIX4X3FVEXTPROC gleswProgramUniformMatrix4x3fvEXT;
 extern PFNGLVALIDATEPROGRAMPIPELINEEXTPROC gleswValidateProgramPipelineEXT;
 extern PFNGLGETPROGRAMPIPELINEINFOLOGEXTPROC gleswGetProgramPipelineInfoLogEXT;
 
+extern PFNGLRENDERBUFFERSTORAGEMULTISAMPLEAPPLEPROC gleswRenderbufferStorageMultisampleAPPLE;
+extern PFNGLRESOLVEMULTISAMPLEFRAMEBUFFERAPPLEPROC gleswResolveMultisampleFramebufferAPPLE;
+extern PFNGLDISCARDFRAMEBUFFEREXTPROC gleswDiscardFramebufferEXT;
+extern PFNGLMAPBUFFEROESPROC gleswMapBufferOES;
+
 #define glActiveTexture		gleswActiveTexture
 #define glAttachShader		gleswAttachShader
 #define glBindAttribLocation		gleswBindAttribLocation
@@ -890,6 +900,11 @@ extern PFNGLGETPROGRAMPIPELINEINFOLOGEXTPROC gleswGetProgramPipelineInfoLogEXT;
 #define glProgramUniformMatrix4x3fvEXT		gleswProgramUniformMatrix4x3fvEXT
 #define glValidateProgramPipelineEXT		gleswValidateProgramPipelineEXT
 #define glGetProgramPipelineInfoLogEXT		gleswGetProgramPipelineInfoLogEXT
+
+#define glResolveMultisampleFramebufferAPPLE		gleswResolveMultisampleFramebufferAPPLE
+#define glDiscardFramebufferEXT		gleswDiscardFramebufferEXT
+
+#define glMapBufferOES		gleswMapBufferOES
 
 #ifdef __cplusplus
 }

@@ -56,7 +56,9 @@ namespace Ogre {
             return;
 
 #if OGRE_NO_GLES2_VAO_SUPPORT == 0
-#   if defined(GL_OES_vertex_array_object) || (OGRE_NO_GLES3_SUPPORT == 0)
+        if (!glGenVertexArraysOES)
+            return;
+
         OGRE_CHECK_GL_ERROR(glGenVertexArraysOES(1, &mVAO));
 //        LogManager::getSingleton().logMessage("Created VAO " + StringConverter::toString(mVAO));
         
@@ -66,7 +68,6 @@ namespace Ogre {
                         "Cannot create GL ES Vertex Array Object",
                         "GLES2VertexDeclaration::GLES2VertexDeclaration");
         }
-#   endif
 #endif
     }
 
@@ -74,7 +75,6 @@ namespace Ogre {
     void GLES2VertexDeclaration::_destroyInernalResource()
     {
 #if OGRE_NO_GLES2_VAO_SUPPORT == 0
-#   if defined(GL_OES_vertex_array_object) || (OGRE_NO_GLES3_SUPPORT == 0)
         if (mVAO &&
             Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_VAO))
         {
@@ -83,7 +83,6 @@ namespace Ogre {
             mVAO = 0;
         }
         mBinding.clear();
-#   endif
 #endif
     }
 
@@ -110,13 +109,11 @@ namespace Ogre {
     void GLES2VertexDeclaration::bind(void)
     {
 #if OGRE_NO_GLES2_VAO_SUPPORT == 0
-#   if defined(GL_OES_vertex_array_object) || (OGRE_NO_GLES3_SUPPORT == 0)
         if (mVAO)
         {
 //            LogManager::getSingleton().logMessage("Binding VAO " + StringConverter::toString(mVAO));
             getGLES2SupportRef()->getStateCacheManager()->bindVertexArray(mVAO);
         }
-#   endif
 #endif
     }
 }

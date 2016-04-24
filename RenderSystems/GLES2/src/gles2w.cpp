@@ -629,8 +629,12 @@ static void load_procs(void)
 	gleswFramebufferTexture3DOES = (PFNGLFRAMEBUFFERTEXTURE3DOESPROC) get_proc("glFramebufferTexture3DOES");
 	gleswBindVertexArrayOES = (PFNGLBINDVERTEXARRAYOESPROC) get_proc("glBindVertexArrayOES");
 	gleswDeleteVertexArraysOES = (PFNGLDELETEVERTEXARRAYSOESPROC) get_proc("glDeleteVertexArraysOES");
-	gleswGenVertexArraysOES = (PFNGLGENVERTEXARRAYSOESPROC) get_proc("glGenVertexArraysOES");
-	gleswIsVertexArrayOES = (PFNGLISVERTEXARRAYOESPROC) get_proc("glIsVertexArrayOES");
+	gleswGenVertexArraysOES = (PFNGLGENVERTEXARRAYSOESPROC) get_proc("glGenVertexArrays");
+	if (!gleswGenVertexArraysOES)
+		gleswGenVertexArraysOES = (PFNGLGENVERTEXARRAYSOESPROC) get_proc("glGenVertexArraysOES");
+	gleswIsVertexArrayOES = (PFNGLISVERTEXARRAYOESPROC) get_proc("glIsVertexArray");
+	if (!gleswIsVertexArrayOES)
+		gleswIsVertexArrayOES = (PFNGLISVERTEXARRAYOESPROC) get_proc("glIsVertexArrayOES");
 	gleswDebugMessageControlKHR = (PFNGLDEBUGMESSAGECONTROLKHRPROC) get_proc("glDebugMessageControlKHR");
 	gleswDebugMessageInsertKHR = (PFNGLDEBUGMESSAGEINSERTKHRPROC) get_proc("glDebugMessageInsertKHR");
 	gleswDebugMessageCallbackKHR = (PFNGLDEBUGMESSAGECALLBACKKHRPROC) get_proc("glDebugMessageCallbackKHR");

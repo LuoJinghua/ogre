@@ -418,6 +418,9 @@ namespace Ogre {
                                               uint16 mask, GpuProgramType fromProgType)
 	{
 #if OGRE_NO_GLES3_SUPPORT == 0
+        if (!gleswIsSupported(3, 0))
+            return;
+
         // Iterate through the list of uniform buffers and update them as needed
 		GLUniformBufferIterator currentBuffer = mGLUniformBufferReferences.begin();
 		GLUniformBufferIterator endBuffer = mGLUniformBufferReferences.end();
