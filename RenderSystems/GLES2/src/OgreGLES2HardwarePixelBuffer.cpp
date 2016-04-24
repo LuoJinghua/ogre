@@ -349,13 +349,13 @@ namespace Ogre {
 
         OGRE_CHECK_GL_ERROR(glGenBuffers(1, &mBufferId));
 
+        // Upload data to PBO
+        OGRE_CHECK_GL_ERROR(glBindBuffer(GL_PIXEL_UNPACK_BUFFER, mBufferId));
+
         if(getGLES2SupportRef()->checkExtension("GL_EXT_debug_label"))
         {
             OGRE_CHECK_GL_ERROR(glLabelObjectEXT(GL_BUFFER_OBJECT_EXT, mBufferId, 0, ("Pixel Buffer #" + StringConverter::toString(mBufferId)).c_str()));
         }
-
-        // Upload data to PBO
-        OGRE_CHECK_GL_ERROR(glBindBuffer(GL_PIXEL_UNPACK_BUFFER, mBufferId));
 
         // Calculate size for all mip levels of the texture
         size_t dataSize = 0;
