@@ -39,6 +39,10 @@
 #include "OgreGLES2Util.h"
 #include "OgreRoot.h"
 
+#if OGRE_COMPILER == OGRE_COMPILER_MSVC
+#define snprintf _snprintf
+#endif
+
 namespace Ogre
 {
     GLSLESProgramPipeline::GLSLESProgramPipeline(GLSLESGpuProgram* vertexProgram, GLSLESGpuProgram* fragmentProgram) : 
@@ -190,8 +194,9 @@ namespace Ogre
             // For uv and other case the index is a part of the name
             if (attrib == NOT_FOUND_CUSTOM_ATTRIBUTES_INDEX)
             {
-                String attStringWithSemantic = String(attString) + StringConverter::toString(index);
-                OGRE_CHECK_GL_ERROR(attrib = glGetAttribLocation(handle, attStringWithSemantic.c_str()));
+                char attStringWithSemantic[128] = { '\0' };
+                snprintf(attStringWithSemantic, sizeof(attStringWithSemantic), "%s%d", attString, index);
+                OGRE_CHECK_GL_ERROR(attrib = glGetAttribLocation(handle, attStringWithSemantic));
             }
             
             // Update mCustomAttributesIndexes with the index we found (or didn't find) 
