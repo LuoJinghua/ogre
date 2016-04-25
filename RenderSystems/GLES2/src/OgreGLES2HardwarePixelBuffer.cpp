@@ -327,18 +327,22 @@ namespace Ogre {
     //-----------------------------------------------------------------------------
     void GLES2TextureBuffer::upload(const PixelBox &data, const Image::Box &dest)
     {
+#if OGRE_NO_GLES3_SUPPORT == 0
         if (gleswIsSupported(3, 0))
             uploadGLES3Impl(data, dest);
         else
+#endif
             uploadGLES2Impl(data, dest);
     }
 
     //-----------------------------------------------------------------------------
     void GLES2TextureBuffer::download(const PixelBox &data)
     {
+#if OGRE_NO_GLES3_SUPPORT == 0
         if (gleswIsSupported(3, 0))
             downloadGLES3Impl(data);
         else
+#endif
             downloadGLES2Impl(data);
     }
 
