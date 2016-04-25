@@ -123,6 +123,9 @@ void ProgramManager::releasePrograms(Pass* pass, TargetRenderState* renderState)
 {
 	ProgramSet* programSet = renderState->getProgramSet();
 
+	if (!programSet)
+		return;
+
 	pass->setVertexProgram(StringUtil::BLANK);
 	pass->setFragmentProgram(StringUtil::BLANK);
 
