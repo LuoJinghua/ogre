@@ -439,10 +439,18 @@ namespace Ogre {
 		
 		// No point sprites, so no size
 		rsc->setMaxPointSize(0.f);
-        
-        if(glBindVertexArrayOES &&
+
+#if OGRE_NO_GLES2_VAO_SUPPORT == 0
+        if(glGenVertexArraysOES && glDeleteVertexArraysOES && glBindVertexArrayOES &&
            (mGLSupport->checkExtension("GL_OES_vertex_array_object") || gleswIsSupported(3, 0)))
-            rsc->setCapability(RSC_VAO);
+        {
+            GLuint vao = 0;
+            glGenVertexArraysOES(1, &vao);
+            glDeleteVertexArraysOES(1, &vao);
+            if (vao)
+                rsc->setCapability(RSC_VAO);
+        }
+#endif
 
 		if (mGLSupport->checkExtension("GL_OES_get_program_binary") || gleswIsSupported(3, 0))
 		{
