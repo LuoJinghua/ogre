@@ -61,6 +61,29 @@ namespace Ogre
     }
 
     //-----------------------------------------------------------------------
+    void GLSLESProgramPipelineManager::destroyAllByProgram(GLSLESGpuProgram* gpuProgram)
+    {
+        std::vector<uint64> keysToErase;
+        for (ProgramPipelineIterator currentProgram = mProgramPipelines.begin();
+             currentProgram != mProgramPipelines.end(); ++currentProgram)
+        {
+            GLSLESProgramPipeline* prgm = currentProgram->second;
+            if(prgm->getVertexProgram() == gpuProgram || prgm->getFragmentProgram() == gpuProgram)
+            {
+                if (mActiveProgramPipeline == prgm)
+                    mActiveProgramPipeline = 0;
+                OGRE_DELETE prgm;
+                keysToErase.push_back(currentProgram->first);
+            }
+        }
+        
+        for(size_t i = 0; i < keysToErase.size(); ++i)
+        {
+            mProgramPipelines.erase(keysToErase[i]);
+        }
+    }
+
+    //-----------------------------------------------------------------------
 	void GLSLESProgramPipelineManager::setActiveFragmentLinkProgram(GLSLESGpuProgram* fragmentGpuProgram)
 	{
 		if (fragmentGpuProgram != mActiveFragmentGpuProgram)

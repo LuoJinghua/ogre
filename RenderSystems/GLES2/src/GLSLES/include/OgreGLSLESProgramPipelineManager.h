@@ -63,6 +63,11 @@ namespace Ogre
 		GLSLESProgramPipelineManager(void);
 		~GLSLESProgramPipelineManager(void);
 
+        /**
+         Destroy all programs which referencing this gpu program
+         */
+        void destroyAllByProgram(GLSLESGpuProgram* gpuProgram);
+
 		/**
          Get the program object that links the two active program objects together.
          If a program pipeline object was not already created and linked a new one is created and linked.
