@@ -30,6 +30,7 @@
 
 #include "OgreGLES2Prerequisites.h"
 #include "OgreGLSLESProgramCommon.h"
+#include "OgreGLES2ManagedResource.h"
 
 namespace Ogre
 {
@@ -100,6 +101,14 @@ namespace Ogre
         virtual void extractLayoutQualifiers(void);
         /// Build uniform references from active named uniforms
 		virtual void buildGLUniformReferences(void);
+
+#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
+        /** See AndroidResource. */
+        virtual void notifyOnContextLost();
+
+        /** See AndroidResource. */
+        virtual void notifyOnContextReset();
+#endif
     };
 }
 

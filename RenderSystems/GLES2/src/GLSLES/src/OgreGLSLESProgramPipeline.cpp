@@ -207,6 +207,21 @@ namespace Ogre
         return res;
     }
 
+#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
+    void GLSLESProgramPipeline::notifyOnContextLost()
+    {
+        OGRE_CHECK_GL_ERROR(glBindProgramPipelineEXT(mGLProgramPipelineHandle));
+        mGLProgramPipelineHandle = 0;
+        mLinked = false;
+        mTriedToLinkAndFailed = false;
+        mUniformRefsBuilt = false;
+    }
+
+    void GLSLESProgramPipeline::notifyOnContextReset()
+    {
+    }
+#endif
+
     //-----------------------------------------------------------------------
     void GLSLESProgramPipeline::activate(void)
     {
