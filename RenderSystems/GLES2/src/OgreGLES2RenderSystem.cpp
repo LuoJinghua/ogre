@@ -2434,22 +2434,23 @@ namespace Ogre {
             {
                 GLSLESProgramPipeline* programPipeline =
                 GLSLESProgramPipelineManager::getSingleton().getActiveProgramPipeline();
-                if (!programPipeline || !programPipeline->isAttributeValid(sem, elemIndex))
-                {
+                if (!programPipeline)
                     return;
-                }
-
-                attrib = (GLuint)programPipeline->getAttributeIndex(sem, elemIndex);
+                GLint index = programPipeline->getAttributeIndex(sem, elemIndex);
+                if (index < 0)
+                    return;
+                attrib = (GLuint)index;
             }
             else
             {
                 GLSLESLinkProgram* linkProgram = GLSLESLinkProgramManager::getSingleton().getActiveLinkProgram();
-                if (!linkProgram || !linkProgram->isAttributeValid(sem, elemIndex))
-                {
+                if (!linkProgram)
                     return;
-                }
+                GLint index = linkProgram->getAttributeIndex(sem, elemIndex);
+                if (index < 0)
+                    return;
 
-                attrib = (GLuint)linkProgram->getAttributeIndex(sem, elemIndex);
+                attrib = (GLuint)index;
             }
 
             if (binding && binding->isSameBuffer(attrib,
