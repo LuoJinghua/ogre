@@ -705,11 +705,7 @@ static void load_procs(void)
 	gleswGetActiveUniformBlockName = (PFNGLGETACTIVEUNIFORMBLOCKNAMEPROC) get_proc("glGetActiveUniformBlockName");
 	gleswUniformBlockBinding = (PFNGLUNIFORMBLOCKBINDINGPROC) get_proc("glUniformBlockBinding");
 	gleswDrawArraysInstanced = (PFNGLDRAWARRAYSINSTANCEDPROC) get_proc("glDrawArraysInstanced");
-	if (!gleswDrawArraysInstanced)
-		gleswDrawArraysInstanced = (PFNGLDRAWARRAYSINSTANCEDPROC) get_proc("glDrawArraysInstanced");
-	gleswDrawElementsInstanced = (PFNGLDRAWELEMENTSINSTANCEDPROC) get_proc("glDrawElementsInstancedEXT");
-	if (!gleswDrawElementsInstanced)
-		gleswDrawElementsInstanced = (PFNGLDRAWELEMENTSINSTANCEDPROC) get_proc("glDrawElementsInstancedEXT");
+	gleswDrawElementsInstanced = (PFNGLDRAWELEMENTSINSTANCEDPROC) get_proc("glDrawElementsInstanced");
 	gleswFenceSync = (PFNGLFENCESYNCPROC) get_proc("glFenceSync");
 	gleswIsSync = (PFNGLISSYNCPROC) get_proc("glIsSync");
 	gleswDeleteSync = (PFNGLDELETESYNCPROC) get_proc("glDeleteSync");
@@ -730,8 +726,6 @@ static void load_procs(void)
 	gleswGetSamplerParameteriv = (PFNGLGETSAMPLERPARAMETERIVPROC) get_proc("glGetSamplerParameteriv");
 	gleswGetSamplerParameterfv = (PFNGLGETSAMPLERPARAMETERFVPROC) get_proc("glGetSamplerParameterfv");
 	gleswVertexAttribDivisor = (PFNGLVERTEXATTRIBDIVISORPROC) get_proc("glVertexAttribDivisor");
-	if (!gleswVertexAttribDivisor)
-		gleswVertexAttribDivisor = (PFNGLVERTEXATTRIBDIVISORPROC) get_proc("glVertexAttribDivisorEXT");
 	gleswBindTransformFeedback = (PFNGLBINDTRANSFORMFEEDBACKPROC) get_proc("glBindTransformFeedback");
 	gleswDeleteTransformFeedbacks = (PFNGLDELETETRANSFORMFEEDBACKSPROC) get_proc("glDeleteTransformFeedbacks");
 	gleswGenTransformFeedbacks = (PFNGLGENTRANSFORMFEEDBACKSPROC) get_proc("glGenTransformFeedbacks");
@@ -739,9 +733,6 @@ static void load_procs(void)
 	gleswPauseTransformFeedback = (PFNGLPAUSETRANSFORMFEEDBACKPROC) get_proc("glPauseTransformFeedback");
 	gleswResumeTransformFeedback = (PFNGLRESUMETRANSFORMFEEDBACKPROC) get_proc("glResumeTransformFeedback");
 	gleswGetProgramBinary = (PFNGLGETPROGRAMBINARYPROC) get_proc("glGetProgramBinary");
-	if (!gleswGetProgramBinary)
-		gleswGetProgramBinary = (PFNGLGETPROGRAMBINARYPROC) get_proc("glGetProgramBinaryOES");
-
 	gleswProgramBinary = (PFNGLPROGRAMBINARYPROC) get_proc("glProgramBinary");
 	gleswProgramParameteri = (PFNGLPROGRAMPARAMETERIPROC) get_proc("glProgramParameteri");
 	gleswInvalidateFramebuffer = (PFNGLINVALIDATEFRAMEBUFFERPROC) get_proc("glInvalidateFramebuffer");
@@ -795,4 +786,93 @@ static void load_procs(void)
 	gleswDiscardFramebufferEXT = (PFNGLDISCARDFRAMEBUFFEREXTPROC)
 		get_proc("glDiscardFramebufferEXT");
 	gleswMapBufferOES = (PFNGLMAPBUFFEROESPROC) get_proc("glMapBufferOES");
+
+	struct {
+		int major, minor;
+	} gl_version;
+
+	gl_version.major = 2;
+	gl_version.minor = 0;
+
+	if (glGetIntegerv)
+	{
+		glGetIntegerv(GL_MAJOR_VERSION, &gl_version.major);
+		glGetIntegerv(GL_MINOR_VERSION, &gl_version.minor);
+	}
+
+	if (gl_version.major < 3 && get_proc("glGetProgramBinaryOES"))
+	{
+		gleswGetProgramBinary = (PFNGLGETPROGRAMBINARYPROC) get_proc("glGetProgramBinaryOES");
+		gleswProgramBinary = (PFNGLPROGRAMBINARYPROC) get_proc("glProgramBinaryOES");
+	}
+
+	if (gl_version.major < 3 && get_proc("glMapBufferRangeOES"))
+	{
+		gleswUnmapBuffer = (PFNGLUNMAPBUFFERPROC) get_proc("glUnmapBufferOES");
+		gleswGetBufferPointerv = (PFNGLGETBUFFERPOINTERVPROC) get_proc("glGetBufferPointervOES");
+	}
+
+	if (gl_version.major < 3 && get_proc("glMapBufferRangeEXT"))
+	{
+		gleswMapBufferRange = (PFNGLMAPBUFFERRANGEPROC) get_proc("glMapBufferRangeEXT");
+		gleswFlushMappedBufferRange = (PFNGLFLUSHMAPPEDBUFFERRANGEPROC) get_proc("glFlushMappedBufferRangeEXT");
+	}
+
+	if (gl_version.major < 3 && get_proc("glTexImage3DOES"))
+	{
+		gleswTexImage3D = (PFNGLTEXIMAGE3DPROC) get_proc("glTexImage3DOES");
+		gleswTexSubImage3D = (PFNGLTEXSUBIMAGE3DPROC) get_proc("glTexSubImage3DOES");
+		gleswCopyTexSubImage3D = (PFNGLCOPYTEXSUBIMAGE3DPROC) get_proc("glCopyTexSubImage3DOES");
+		gleswCompressedTexImage3D = (PFNGLCOMPRESSEDTEXIMAGE3DPROC) get_proc("glCompressedTexImage3DOES");
+		gleswCompressedTexSubImage3D = (PFNGLCOMPRESSEDTEXSUBIMAGE3DPROC) get_proc("glCompressedTexSubImage3DOES");
+	}
+
+	if (gl_version.major < 3 && get_proc("glBindVertexArrayOES"))
+	{
+		gleswBindVertexArray = (PFNGLBINDVERTEXARRAYPROC) get_proc("glBindVertexArrayOES");
+		gleswDeleteVertexArrays = (PFNGLDELETEVERTEXARRAYSPROC) get_proc("glDeleteVertexArraysOES");
+		gleswGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC) get_proc("glGenVertexArraysOES");
+		gleswIsVertexArray = (PFNGLISVERTEXARRAYPROC) get_proc("glIsVertexArrayOES");
+	}
+
+	if (gl_version.major < 3 && get_proc("glVertexAttribDivisorEXT"))
+	{
+		gleswVertexAttribDivisor = (PFNGLVERTEXATTRIBDIVISORPROC) get_proc("glVertexAttribDivisorEXT");
+		gleswDrawElementsInstanced = (PFNGLDRAWELEMENTSINSTANCEDPROC) get_proc("glDrawElementsInstancedEXT");
+		gleswDrawArraysInstanced = (PFNGLDRAWARRAYSINSTANCEDPROC) get_proc("glDrawArraysInstancedEXT");
+	}
+
+	if ((gl_version.major > 3 || (gl_version.major == 3 && gl_version.minor >= 1)) && get_proc("glUseProgramStages"))
+	{
+		gleswUseProgramStagesEXT = (PFNGLUSEPROGRAMSTAGESEXTPROC) get_proc("glUseProgramStages");
+		gleswActiveShaderProgramEXT = (PFNGLACTIVESHADERPROGRAMEXTPROC) get_proc("glActiveShaderProgram");
+		gleswCreateShaderProgramvEXT = (PFNGLCREATESHADERPROGRAMVEXTPROC) get_proc("glCreateShaderProgramv");
+		gleswBindProgramPipelineEXT = (PFNGLBINDPROGRAMPIPELINEEXTPROC) get_proc("glBindProgramPipeline");
+		gleswDeleteProgramPipelinesEXT = (PFNGLDELETEPROGRAMPIPELINESEXTPROC) get_proc("glDeleteProgramPipelines");
+		gleswGenProgramPipelinesEXT = (PFNGLGENPROGRAMPIPELINESEXTPROC) get_proc("glGenProgramPipelines");
+		gleswIsProgramPipelineEXT = (PFNGLISPROGRAMPIPELINEEXTPROC) get_proc("glIsProgramPipeline");
+		gleswProgramParameteriEXT = (PFNGLPROGRAMPARAMETERIEXTPROC) get_proc("glProgramParameteri");
+		gleswGetProgramPipelineivEXT = (PFNGLGETPROGRAMPIPELINEIVEXTPROC) get_proc("glGetProgramPipelineiv");
+		gleswProgramUniform1iEXT = (PFNGLPROGRAMUNIFORM1IEXTPROC) get_proc("glProgramUniform1i");
+		gleswProgramUniform2iEXT = (PFNGLPROGRAMUNIFORM2IEXTPROC) get_proc("glProgramUniform2i");
+		gleswProgramUniform3iEXT = (PFNGLPROGRAMUNIFORM3IEXTPROC) get_proc("glProgramUniform3i");
+		gleswProgramUniform4iEXT = (PFNGLPROGRAMUNIFORM4IEXTPROC) get_proc("glProgramUniform4i");
+		gleswProgramUniform1fEXT = (PFNGLPROGRAMUNIFORM1FEXTPROC) get_proc("glProgramUniform1f");
+		gleswProgramUniform2fEXT = (PFNGLPROGRAMUNIFORM2FEXTPROC) get_proc("glProgramUniform2f");
+		gleswProgramUniform3fEXT = (PFNGLPROGRAMUNIFORM3FEXTPROC) get_proc("glProgramUniform3f");
+		gleswProgramUniform4fEXT = (PFNGLPROGRAMUNIFORM4FEXTPROC) get_proc("glProgramUniform4f");
+		gleswProgramUniform1ivEXT = (PFNGLPROGRAMUNIFORM1IVEXTPROC) get_proc("glProgramUniform1iv");
+		gleswProgramUniform2ivEXT = (PFNGLPROGRAMUNIFORM2IVEXTPROC) get_proc("glProgramUniform2iv");
+		gleswProgramUniform3ivEXT = (PFNGLPROGRAMUNIFORM3IVEXTPROC) get_proc("glProgramUniform3iv");
+		gleswProgramUniform4ivEXT = (PFNGLPROGRAMUNIFORM4IVEXTPROC) get_proc("glProgramUniform4iv");
+		gleswProgramUniform1fvEXT = (PFNGLPROGRAMUNIFORM1FVEXTPROC) get_proc("glProgramUniform1fv");
+		gleswProgramUniform2fvEXT = (PFNGLPROGRAMUNIFORM2FVEXTPROC) get_proc("glProgramUniform2fv");
+		gleswProgramUniform3fvEXT = (PFNGLPROGRAMUNIFORM3FVEXTPROC) get_proc("glProgramUniform3fv");
+		gleswProgramUniform4fvEXT = (PFNGLPROGRAMUNIFORM4FVEXTPROC) get_proc("glProgramUniform4fv");
+		gleswProgramUniformMatrix2fvEXT = (PFNGLPROGRAMUNIFORMMATRIX2FVEXTPROC) get_proc("glProgramUniformMatrix2fv");
+		gleswProgramUniformMatrix3fvEXT = (PFNGLPROGRAMUNIFORMMATRIX3FVEXTPROC) get_proc("glProgramUniformMatrix3fv");
+		gleswProgramUniformMatrix4fvEXT = (PFNGLPROGRAMUNIFORMMATRIX4FVEXTPROC) get_proc("glProgramUniformMatrix4fv");
+		gleswValidateProgramPipelineEXT = (PFNGLVALIDATEPROGRAMPIPELINEEXTPROC) get_proc("glValidateProgramPipeline");
+		gleswGetProgramPipelineInfoLogEXT = (PFNGLGETPROGRAMPIPELINEINFOLOGEXTPROC) get_proc("glGetProgramPipelineInfoLog");
+	}
 }
