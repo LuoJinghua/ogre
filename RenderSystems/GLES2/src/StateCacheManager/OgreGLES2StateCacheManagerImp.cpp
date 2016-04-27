@@ -370,11 +370,13 @@ namespace Ogre {
 
     void GLES2StateCacheManagerImp::bindGLTexture(GLenum target, GLuint texture)
     {
-        mLastBoundTexID = texture;
-        mActiveTexture[mActiveTextureUnit] = texture;
-
-        // Update GL
-        OGRE_CHECK_GL_ERROR(glBindTexture(target, texture));
+        GLuint& lastBoundTexID = mActiveTexture[mActiveTextureUnit];
+        if (lastBoundTexID != texture)
+        {
+            // Update GL
+            OGRE_CHECK_GL_ERROR(glBindTexture(target, texture));
+            lastBoundTexID = texture;
+        }
     }
     
     bool GLES2StateCacheManagerImp::activateGLTextureUnit(size_t unit)
