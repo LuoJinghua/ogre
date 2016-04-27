@@ -350,7 +350,8 @@ namespace Ogre
 	void Resource::touch(void) 
 	{
         // make sure loaded
-        load();
+        if (!isLoaded())
+            load();
 
 		if(mCreator)
 			mCreator->_notifyResourceTouched(this);
