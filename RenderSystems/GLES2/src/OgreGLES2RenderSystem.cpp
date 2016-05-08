@@ -445,8 +445,16 @@ namespace Ogre {
            (mGLSupport->checkExtension("GL_OES_vertex_array_object") || gleswIsSupported(3, 0)))
         {
             GLuint vao = 0;
-            glGenVertexArraysOES(1, &vao);
-            glDeleteVertexArraysOES(1, &vao);
+            String deviceName = rsc->getDeviceName();
+            if (deviceName != "Adreno (TM) 200" &&
+                deviceName != "Adreno (TM) 203" &&
+                deviceName != "Adreno (TM) 205" &&
+                deviceName != "Adreno (TM) 220")
+            {
+                OGRE_CHECK_GL_ERROR(glGenVertexArraysOES(1, &vao));
+                if (vao)
+                    OGRE_CHECK_GL_ERROR(glDeleteVertexArraysOES(1, &vao));
+            }
             if (vao)
                 rsc->setCapability(RSC_VAO);
         }
