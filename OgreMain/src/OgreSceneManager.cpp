@@ -968,10 +968,11 @@ const Pass* SceneManager::_setPass(const Pass* pass, bool evenIfSuppressed,
 
 		if (pass->hasVertexProgram())
 		{
-			bindGpuProgram(pass->getVertexProgram()->_getBindingDelegate());
+			const GpuProgramPtr& program = pass->getVertexProgram();
+			bindGpuProgram(program->_getBindingDelegate());
 			// bind parameters later 
 			// does the vertex program want surface and light params passed to rendersystem?
-			passSurfaceAndLightParams = pass->getVertexProgram()->getPassSurfaceAndLightStates();
+			passSurfaceAndLightParams = program->getPassSurfaceAndLightStates();
 		}
 		else
 		{
@@ -1049,9 +1050,10 @@ const Pass* SceneManager::_setPass(const Pass* pass, bool evenIfSuppressed,
 		// Using a fragment program?
 		if (pass->hasFragmentProgram())
 		{
-			bindGpuProgram(pass->getFragmentProgram()->_getBindingDelegate());
+			const GpuProgramPtr& program = pass->getFragmentProgram();
+			bindGpuProgram(program->_getBindingDelegate());
 			// bind parameters later 
-			passFogParams = pass->getFragmentProgram()->getPassFogStates();
+			passFogParams = program->getPassFogStates();
 		}
 		else
 		{
