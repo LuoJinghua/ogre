@@ -106,7 +106,7 @@ namespace Ogre {
 
 /* Define whether or not Ogre compiled with NEON support.
  */
-#if OGRE_DOUBLE_PRECISION == 0 && OGRE_CPU == OGRE_CPU_ARM && (OGRE_COMPILER == OGRE_COMPILER_GNUC || OGRE_COMPILER == OGRE_COMPILER_CLANG) && defined(__ARM_ARCH_7A__) && defined(__ARM_NEON__)
+#if OGRE_DOUBLE_PRECISION == 0 && OGRE_CPU == OGRE_CPU_ARM && (OGRE_COMPILER == OGRE_COMPILER_GNUC || OGRE_COMPILER == OGRE_COMPILER_CLANG) && (defined(__ARM_ARCH_7A__) || defined(__arm64__) || defined(__aarch64__)) && defined(__ARM_NEON__)
 #   define __OGRE_HAVE_NEON  1
 #endif
 
