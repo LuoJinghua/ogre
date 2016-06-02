@@ -27,6 +27,8 @@ THE SOFTWARE.
 */
 #include "OgreStableHeaders.h"
 #include "OgreRenderQueueSortingGrouping.h"
+#include "OgreRenderSystem.h"
+#include "OgreRoot.h"
 #include "OgreException.h"
 
 namespace Ogre {
@@ -78,7 +80,15 @@ namespace Ogre {
 	void RenderPriorityGroup::defaultOrganisationMode(void)
 	{
 		resetOrganisationModes();
-		addOrganisationMode(QueuedRenderableCollection::OM_PASS_GROUP);
+
+#if 0
+		RenderSystem* rs = Root::getSingleton().getRenderSystem();
+		if (rs && (rs->getCapabilities()->getVendor() == GPU_ARM  ||
+				   rs->getCapabilities()->getVendor() == GPU_QUALCOMM))
+			addOrganisationMode(QueuedRenderableCollection::OM_SORT_ASCENDING);
+		else
+#endif
+			addOrganisationMode(QueuedRenderableCollection::OM_PASS_GROUP);
 	}
 	//-----------------------------------------------------------------------
     void RenderPriorityGroup::addRenderable(Renderable* rend, Technique* pTech)
@@ -325,6 +335,25 @@ namespace Ogre {
     //-----------------------------------------------------------------------
 	void QueuedRenderableCollection::sort(const Camera* cam)
     {
+        struct SuppressCameraUpdate
+        {
+            SuppressCameraUpdate(Camera* cam) :
+            camera(cam)
+            {
+                camera->suppressUpdate(false);
+                camera->getDerivedPosition();
+                camera->suppressUpdate(true);
+            }
+            
+            ~SuppressCameraUpdate()
+            {
+                camera->suppressUpdate(false);
+            }
+            
+            Camera* camera;
+        };
+        SuppressCameraUpdate suppressCameraUpdate((Camera*)cam);
+
 		// ascending and descending sort both set bit 1
 		// We always sort descending, because the only difference is in the
 		// acceptVisitor method, where we iterate in reverse in ascending mode

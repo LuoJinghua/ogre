@@ -179,6 +179,8 @@ namespace Ogre {
         
         /// Whether or not the minimum display size of objects should take effect for this camera
         bool mUseMinPixelSize;
+        //// Whether or not suppress the updateView
+        bool mSuppressUpdate;
         /// @see Camera::getPixelDisplayRatio
         Real mPixelDisplayRatio;
 
@@ -671,7 +673,8 @@ namespace Ogre {
             This parameter is used in min display size calculations.
         */
         Real getPixelDisplayRatio() const { return mPixelDisplayRatio; }
-        
+
+        void suppressUpdate(bool suppress = true) { mSuppressUpdate = suppress; }
     };
     /** @} */
     /** @} */

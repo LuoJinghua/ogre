@@ -85,7 +85,7 @@ namespace Ogre {
         mReflect = false;
 
         mVisible = false;
-
+        mSuppressUpdate = false;
     }
 
     //-----------------------------------------------------------------------
@@ -329,17 +329,23 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     bool Camera::isViewOutOfDate(void) const
     {
+        if (mSuppressUpdate && !mRecalcView)
+            return false;
+
         // Overridden from Frustum to use local orientation / position offsets
         // Attached to node?
         if (mParentNode != 0)
         {
+            const Quaternion& lastParentOrientation = mParentNode->_getDerivedOrientation();
+            const Vector3& lastParentPosition = mParentNode->_getDerivedPosition();
+
             if (mRecalcView ||
-                mParentNode->_getDerivedOrientation() != mLastParentOrientation ||
-                mParentNode->_getDerivedPosition() != mLastParentPosition)
+                memcmp(&lastParentOrientation, &mLastParentOrientation, sizeof(lastParentOrientation)) ||
+                memcmp(&lastParentPosition, &mLastParentPosition, sizeof(lastParentPosition)))
             {
                 // Ok, we're out of date with SceneNode we're attached to
-                mLastParentOrientation = mParentNode->_getDerivedOrientation();
-                mLastParentPosition = mParentNode->_getDerivedPosition();
+                memcpy(&mLastParentOrientation, &lastParentOrientation, sizeof(lastParentOrientation));
+                memcpy(&mLastParentPosition, &lastParentPosition, sizeof(lastParentPosition));
                 mRealOrientation = mLastParentOrientation * mOrientation;
                 mRealPosition = (mLastParentOrientation * mPosition) + mLastParentPosition;
                 mRecalcView = true;
