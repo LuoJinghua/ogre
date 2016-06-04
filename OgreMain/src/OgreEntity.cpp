@@ -394,6 +394,9 @@ namespace Ogre {
     {
 		MovableObject::_notifyCurrentCamera(cam);
 
+        if (!isVisible())
+            return;
+
         // Calculate the LOD
         if (mParentNode)
         {
