@@ -228,7 +228,7 @@ namespace Ogre {
         Matrix4* pDstMat,
         size_t numMatrices)
     {
-#if __ARM_NEON__
+#if __OGRE_HAVE_NEON
         const Real* m0 = (const Real*)&baseMatrix;
         const Real* m1 = m0 + 8;
 
@@ -275,6 +275,9 @@ namespace Ogre {
                  );
 #else
             asm volatile(
+#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID || OGRE_PLATFORM == OGRE_PLATFORM_LINUX
+                ".fpu neon\n\t"
+#endif
                  "vld1.32     {d16 - d19}, [%4] \n\t"       // M1[m0-m7]
                  "vld1.32     {d20 - d23}, [%5]  \n\t"       // M1[m8-m15]
                  "vld1.32     {d0 - d3}, [%2]   \n\t"       // M2[m0-m7]
