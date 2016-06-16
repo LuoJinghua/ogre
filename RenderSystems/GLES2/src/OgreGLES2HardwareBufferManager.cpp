@@ -38,6 +38,51 @@ THE SOFTWARE.
 #include "OgreRoot.h"
 
 namespace Ogre {
+    class GLES2VertexBufferBinding : public VertexBufferBinding
+    {
+    protected:
+        uint64 mBindings;
+        
+    public:
+        GLES2VertexBufferBinding() :
+            mBindings(0)
+        {
+        }
+
+        void setBinding(unsigned short index, const HardwareVertexBufferSharedPtr& buffer)
+        {
+            VertexBufferBinding::setBinding(index, buffer);
+            mBindings |= uint64(1) << index;
+        }
+
+        void unsetBinding(unsigned short index)
+        {
+            VertexBufferBinding::unsetBinding(index);
+            mBindings &= ~(uint64(1) << index);
+        }
+
+        void unsetAllBindings(void)
+        {
+            VertexBufferBinding::unsetAllBindings();
+            mBindings = 0;
+        }
+
+        bool isBufferBound(unsigned short index) const
+        {
+            return (mBindings & (uint64(1) << index)) != 0;
+        }
+
+        void closeGaps(BindingIndexMap& bindingIndexMap)
+        {
+            VertexBufferBinding::closeGaps(bindingIndexMap);
+            
+            mBindings = 0;
+            VertexBufferBindingMap::const_iterator it =  mBindingMap.begin();
+            for (; it != mBindingMap.end(); ++it)
+                mBindings |= uint64(1) << it->first;
+        }
+    };
+
     //-----------------------------------------------------------------------
     GLES2HardwareBufferManagerBase::GLES2HardwareBufferManagerBase()
     {
@@ -198,4 +243,9 @@ namespace Ogre {
                     "GLES2HardwareBufferManagerBase::createCounterBuffer");
     }
 
+    //---------------------------------------------------------------------
+    VertexBufferBinding* GLES2HardwareBufferManagerBase::createVertexBufferBindingImpl(void)
+    {
+        return OGRE_NEW GLES2VertexBufferBinding();
+    }
 }
