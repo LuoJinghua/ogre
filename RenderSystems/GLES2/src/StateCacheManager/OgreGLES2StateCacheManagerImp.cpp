@@ -186,6 +186,15 @@ namespace Ogre {
     void GLES2StateCacheManagerImp::invalidateStateForTexture(GLuint texture)
     {
         mTexUnitsMap.erase(texture);
+
+        map<GLuint, GLuint>::type::iterator it = mActiveTexture.begin();
+        for (; it != mActiveTexture.end();)
+        {
+            if (it->second == texture)
+                mActiveTexture.erase(it++);
+            else
+                ++it;
+        }
     }
 
     // TODO: Store as high/low bits of a GLuint, use vector instead of map for TexParameteriMap
