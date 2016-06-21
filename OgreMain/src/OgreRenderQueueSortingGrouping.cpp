@@ -337,8 +337,8 @@ namespace Ogre {
     {
         struct SuppressCameraUpdate
         {
-            SuppressCameraUpdate(Camera* cam) :
-            camera(cam)
+            SuppressCameraUpdate(Camera* c) :
+                camera(c)
             {
                 camera->suppressUpdate(false);
                 camera->getDerivedPosition();
@@ -349,17 +349,17 @@ namespace Ogre {
             {
                 camera->suppressUpdate(false);
             }
-            
+
             Camera* camera;
         };
-        SuppressCameraUpdate suppressCameraUpdate((Camera*)cam);
 
 		// ascending and descending sort both set bit 1
 		// We always sort descending, because the only difference is in the
 		// acceptVisitor method, where we iterate in reverse in ascending mode
 		if (mOrganisationMode & OM_SORT_DESCENDING)
 		{
-			
+			SuppressCameraUpdate suppressCameraUpdate(const_cast<Camera*>(cam));
+
 			// We can either use a stable_sort and the 'less' implementation,
 			// or a 2-pass radix sort (once by pass, then by distance, since
 			// radix sorting is inherently stable this will work)
