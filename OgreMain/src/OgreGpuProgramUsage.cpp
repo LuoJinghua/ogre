@@ -104,12 +104,12 @@ namespace Ogre
 
 	}
     //-----------------------------------------------------------------------------
-    void GpuProgramUsage::setParameters(GpuProgramParametersSharedPtr params)
+    void GpuProgramUsage::setParameters(const GpuProgramParametersSharedPtr& params)
     {
         mParameters = params;
     }
     //-----------------------------------------------------------------------------
-    GpuProgramParametersSharedPtr GpuProgramUsage::getParameters(void)
+    const GpuProgramParametersSharedPtr& GpuProgramUsage::getParameters(void)
     {
         if (mParameters.isNull())
         {

@@ -1477,7 +1477,7 @@ namespace Ogre {
 		}
 	}
     //-----------------------------------------------------------------------
-	void Pass::setVertexProgramParameters(GpuProgramParametersSharedPtr params)
+	void Pass::setVertexProgramParameters(const GpuProgramParametersSharedPtr& params)
 	{
             LOCK_PROGRAM(this);
 		if (!mVertexProgramUsage)
@@ -1519,7 +1519,7 @@ namespace Ogre {
 		}
 	}
     //-----------------------------------------------------------------------
-	void Pass::setFragmentProgramParameters(GpuProgramParametersSharedPtr params)
+	void Pass::setFragmentProgramParameters(const GpuProgramParametersSharedPtr& params)
 	{
             LOCK_PROGRAM(this);
 		if (!mFragmentProgramUsage)
@@ -1561,7 +1561,7 @@ namespace Ogre {
 		}
 	}
     //-----------------------------------------------------------------------
-	void Pass::setGeometryProgramParameters(GpuProgramParametersSharedPtr params)
+	void Pass::setGeometryProgramParameters(const GpuProgramParametersSharedPtr& params)
 	{
             LOCK_PROGRAM(this);
 		if (!mGeometryProgramUsage)
@@ -1603,7 +1603,7 @@ namespace Ogre {
 		}
 	}
     //-----------------------------------------------------------------------
-	void Pass::setTesselationHullProgramParameters(GpuProgramParametersSharedPtr params)
+	void Pass::setTesselationHullProgramParameters(const GpuProgramParametersSharedPtr& params)
 	{
             LOCK_PROGRAM(this);
 		if (!mTesselationHullProgramUsage)
@@ -1645,7 +1645,7 @@ namespace Ogre {
 		}
 	}
     //-----------------------------------------------------------------------
-	void Pass::setTesselationDomainProgramParameters(GpuProgramParametersSharedPtr params)
+	void Pass::setTesselationDomainProgramParameters(const GpuProgramParametersSharedPtr& params)
 	{
             LOCK_PROGRAM(this);
 		if (!mTesselationDomainProgramUsage)
@@ -1687,7 +1687,7 @@ namespace Ogre {
 		}
 	}
     //-----------------------------------------------------------------------
-	void Pass::setComputeProgramParameters(GpuProgramParametersSharedPtr params)
+	void Pass::setComputeProgramParameters(const GpuProgramParametersSharedPtr& params)
 	{
             LOCK_PROGRAM(this);
 		if (!mComputeProgramUsage)
@@ -1708,7 +1708,7 @@ namespace Ogre {
 		    return mVertexProgramUsage->getProgramName();
 	}
 	//-----------------------------------------------------------------------
-	GpuProgramParametersSharedPtr Pass::getVertexProgramParameters(void) const
+	const GpuProgramParametersSharedPtr& Pass::getVertexProgramParameters(void) const
 	{
             LOCK_PROGRAM(this);
 		if (!mVertexProgramUsage)
@@ -1735,7 +1735,7 @@ namespace Ogre {
     		return mFragmentProgramUsage->getProgramName();
 	}
 	//-----------------------------------------------------------------------
-	GpuProgramParametersSharedPtr Pass::getFragmentProgramParameters(void) const
+	const GpuProgramParametersSharedPtr& Pass::getFragmentProgramParameters(void) const
 	{
             LOCK_PROGRAM(this);
 		return mFragmentProgramUsage->getParameters();
@@ -1756,7 +1756,7 @@ namespace Ogre {
     		return mGeometryProgramUsage->getProgramName();
 	}
 	//-----------------------------------------------------------------------
-	GpuProgramParametersSharedPtr Pass::getGeometryProgramParameters(void) const
+	const GpuProgramParametersSharedPtr& Pass::getGeometryProgramParameters(void) const
 	{
             LOCK_PROGRAM(this);
 		return mGeometryProgramUsage->getParameters();
@@ -1777,7 +1777,7 @@ namespace Ogre {
     		return mTesselationHullProgramUsage->getProgramName();
 	}
 	//-----------------------------------------------------------------------
-	GpuProgramParametersSharedPtr Pass::getTesselationHullProgramParameters(void) const
+	const GpuProgramParametersSharedPtr& Pass::getTesselationHullProgramParameters(void) const
 	{
             LOCK_PROGRAM(this);
 		return mTesselationHullProgramUsage->getParameters();
@@ -1798,7 +1798,7 @@ namespace Ogre {
     		return mTesselationDomainProgramUsage->getProgramName();
 	}
 	//-----------------------------------------------------------------------
-	GpuProgramParametersSharedPtr Pass::getTesselationDomainProgramParameters(void) const
+	const GpuProgramParametersSharedPtr& Pass::getTesselationDomainProgramParameters(void) const
 	{
             LOCK_PROGRAM(this);
 		return mTesselationDomainProgramUsage->getParameters();
@@ -1819,7 +1819,7 @@ namespace Ogre {
     		return mComputeProgramUsage->getProgramName();
 	}
 	//-----------------------------------------------------------------------
-	GpuProgramParametersSharedPtr Pass::getComputeProgramParameters(void) const
+	const GpuProgramParametersSharedPtr& Pass::getComputeProgramParameters(void) const
 	{
             LOCK_PROGRAM(this);
 		return mComputeProgramUsage->getParameters();
@@ -2067,7 +2067,7 @@ namespace Ogre {
         mParent->_notifyNeedsRecompile();
     }
     //-----------------------------------------------------------------------
-    void Pass::setShadowCasterVertexProgramParameters(GpuProgramParametersSharedPtr params)
+    void Pass::setShadowCasterVertexProgramParameters(const GpuProgramParametersSharedPtr& params)
     {
         if (!mShadowCasterVertexProgramUsage)
         {
@@ -2086,7 +2086,7 @@ namespace Ogre {
             return mShadowCasterVertexProgramUsage->getProgramName();
     }
     //-----------------------------------------------------------------------
-    GpuProgramParametersSharedPtr Pass::getShadowCasterVertexProgramParameters(void) const
+    const GpuProgramParametersSharedPtr& Pass::getShadowCasterVertexProgramParameters(void) const
     {
         if (!mShadowCasterVertexProgramUsage)
         {
@@ -2122,7 +2122,7 @@ namespace Ogre {
         mParent->_notifyNeedsRecompile();
     }
     //-----------------------------------------------------------------------
-    void Pass::setShadowCasterFragmentProgramParameters(GpuProgramParametersSharedPtr params)
+    void Pass::setShadowCasterFragmentProgramParameters(const GpuProgramParametersSharedPtr& params)
     {
         if (Ogre::Root::getSingletonPtr()->getRenderSystem()->getName().find("OpenGL ES 2") != String::npos)
         {
@@ -2144,7 +2144,7 @@ namespace Ogre {
             return mShadowCasterFragmentProgramUsage->getProgramName();
     }
     //-----------------------------------------------------------------------
-    GpuProgramParametersSharedPtr Pass::getShadowCasterFragmentProgramParameters(void) const
+    const GpuProgramParametersSharedPtr& Pass::getShadowCasterFragmentProgramParameters(void) const
     {
         if (Ogre::Root::getSingletonPtr()->getRenderSystem()->getName().find("OpenGL ES 2") != String::npos)
         {
@@ -2183,7 +2183,7 @@ namespace Ogre {
         mParent->_notifyNeedsRecompile();
     }
     //-----------------------------------------------------------------------
-    void Pass::setShadowReceiverVertexProgramParameters(GpuProgramParametersSharedPtr params)
+    void Pass::setShadowReceiverVertexProgramParameters(const GpuProgramParametersSharedPtr& params)
     {
         if (!mShadowReceiverVertexProgramUsage)
         {
@@ -2202,7 +2202,7 @@ namespace Ogre {
             return mShadowReceiverVertexProgramUsage->getProgramName();
     }
     //-----------------------------------------------------------------------
-    GpuProgramParametersSharedPtr Pass::getShadowReceiverVertexProgramParameters(void) const
+    const GpuProgramParametersSharedPtr& Pass::getShadowReceiverVertexProgramParameters(void) const
     {
         if (!mShadowReceiverVertexProgramUsage)
         {
@@ -2238,7 +2238,7 @@ namespace Ogre {
 		mParent->_notifyNeedsRecompile();
 	}
 	//-----------------------------------------------------------------------
-	void Pass::setShadowReceiverFragmentProgramParameters(GpuProgramParametersSharedPtr params)
+	void Pass::setShadowReceiverFragmentProgramParameters(const GpuProgramParametersSharedPtr& params)
 	{
 		if (!mShadowReceiverFragmentProgramUsage)
 		{
@@ -2257,7 +2257,7 @@ namespace Ogre {
 			return mShadowReceiverFragmentProgramUsage->getProgramName();
 	}
 	//-----------------------------------------------------------------------
-	GpuProgramParametersSharedPtr Pass::getShadowReceiverFragmentProgramParameters(void) const
+	const GpuProgramParametersSharedPtr& Pass::getShadowReceiverFragmentProgramParameters(void) const
 	{
 		if (!mShadowReceiverFragmentProgramUsage)
 		{

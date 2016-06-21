@@ -1228,11 +1228,11 @@ namespace Ogre {
 			designed for low-level programs; use the named parameter methods
 			for setting high-level program parameters.
 		*/
-		void setVertexProgramParameters(GpuProgramParametersSharedPtr params);
+		void setVertexProgramParameters(const GpuProgramParametersSharedPtr& params);
 		/** Gets the name of the vertex program used by this pass. */
 		const String& getVertexProgramName(void) const;
         /** Gets the vertex program parameters used by this pass. */
-        GpuProgramParametersSharedPtr getVertexProgramParameters(void) const;
+        const GpuProgramParametersSharedPtr& getVertexProgramParameters(void) const;
 		/** Gets the vertex program used by this pass, only available after _load(). */
 		const GpuProgramPtr& getVertexProgram(void) const;
 
@@ -1273,11 +1273,11 @@ namespace Ogre {
         designed for low-level programs; use the named parameter methods
         for setting high-level program parameters.
         */
-        void setShadowCasterVertexProgramParameters(GpuProgramParametersSharedPtr params);
+        void setShadowCasterVertexProgramParameters(const GpuProgramParametersSharedPtr& params);
         /** Gets the name of the vertex program used by this pass when rendering shadow casters. */
         const String& getShadowCasterVertexProgramName(void) const;
         /** Gets the vertex program parameters used by this pass when rendering shadow casters. */
-        GpuProgramParametersSharedPtr getShadowCasterVertexProgramParameters(void) const;
+        const GpuProgramParametersSharedPtr& getShadowCasterVertexProgramParameters(void) const;
         /** Gets the vertex program used by this pass when rendering shadow casters,
             only available after _load(). */
         const GpuProgramPtr& getShadowCasterVertexProgram(void) const;
@@ -1318,11 +1318,11 @@ namespace Ogre {
         designed for low-level programs; use the named parameter methods
         for setting high-level program parameters.
         */
-        void setShadowCasterFragmentProgramParameters(GpuProgramParametersSharedPtr params);
+        void setShadowCasterFragmentProgramParameters(const GpuProgramParametersSharedPtr& params);
         /** Gets the name of the fragment program used by this pass when rendering shadow casters. */
         const String& getShadowCasterFragmentProgramName(void) const;
         /** Gets the fragment program parameters used by this pass when rendering shadow casters. */
-        GpuProgramParametersSharedPtr getShadowCasterFragmentProgramParameters(void) const;
+        const GpuProgramParametersSharedPtr& getShadowCasterFragmentProgramParameters(void) const;
         /** Gets the fragment program used by this pass when rendering shadow casters,
             only available after _load(). */
         const GpuProgramPtr& getShadowCasterFragmentProgram(void) const;
@@ -1359,7 +1359,7 @@ namespace Ogre {
         designed for low-level programs; use the named parameter methods
         for setting high-level program parameters.
         */
-        void setShadowReceiverVertexProgramParameters(GpuProgramParametersSharedPtr params);
+        void setShadowReceiverVertexProgramParameters(const GpuProgramParametersSharedPtr& params);
 
 		/** This method allows you to specify a fragment program for use when
 			rendering a texture shadow receiver.
@@ -1388,12 +1388,12 @@ namespace Ogre {
         designed for low-level programs; use the named parameter methods
         for setting high-level program parameters.
         */
-        void setShadowReceiverFragmentProgramParameters(GpuProgramParametersSharedPtr params);
+        void setShadowReceiverFragmentProgramParameters(const GpuProgramParametersSharedPtr& params);
 
         /** Gets the name of the vertex program used by this pass when rendering shadow receivers. */
         const String& getShadowReceiverVertexProgramName(void) const;
         /** Gets the vertex program parameters used by this pass when rendering shadow receivers. */
-        GpuProgramParametersSharedPtr getShadowReceiverVertexProgramParameters(void) const;
+        const GpuProgramParametersSharedPtr& getShadowReceiverVertexProgramParameters(void) const;
         /** Gets the vertex program used by this pass when rendering shadow receivers,
         only available after _load(). */
         const GpuProgramPtr& getShadowReceiverVertexProgram(void) const;
@@ -1401,7 +1401,7 @@ namespace Ogre {
 		/** Gets the name of the fragment program used by this pass when rendering shadow receivers. */
 		const String& getShadowReceiverFragmentProgramName(void) const;
 		/** Gets the fragment program parameters used by this pass when rendering shadow receivers. */
-		GpuProgramParametersSharedPtr getShadowReceiverFragmentProgramParameters(void) const;
+		const GpuProgramParametersSharedPtr& getShadowReceiverFragmentProgramParameters(void) const;
 		/** Gets the fragment program used by this pass when rendering shadow receivers,
 		only available after _load(). */
 		const GpuProgramPtr& getShadowReceiverFragmentProgram(void) const;
@@ -1427,11 +1427,11 @@ namespace Ogre {
 		@remarks
 			Only applicable to programmable passes.
 		*/
-		void setFragmentProgramParameters(GpuProgramParametersSharedPtr params);
+		void setFragmentProgramParameters(const GpuProgramParametersSharedPtr& params);
 		/** Gets the name of the fragment program used by this pass. */
 		const String& getFragmentProgramName(void) const;
 		/** Gets the fragment program parameters used by this pass. */
-		GpuProgramParametersSharedPtr getFragmentProgramParameters(void) const;
+		const GpuProgramParametersSharedPtr& getFragmentProgramParameters(void) const;
 		/** Gets the fragment program used by this pass, only available after _load(). */
 		const GpuProgramPtr& getFragmentProgram(void) const;
 
@@ -1456,11 +1456,11 @@ namespace Ogre {
 		@remarks
 			Only applicable to programmable passes.
 		*/
-		void setGeometryProgramParameters(GpuProgramParametersSharedPtr params);
+		void setGeometryProgramParameters(const GpuProgramParametersSharedPtr& params);
 		/** Gets the name of the geometry program used by this pass. */
 		const String& getGeometryProgramName(void) const;
 		/** Gets the geometry program parameters used by this pass. */
-		GpuProgramParametersSharedPtr getGeometryProgramParameters(void) const;
+		const GpuProgramParametersSharedPtr& getGeometryProgramParameters(void) const;
 		/** Gets the geometry program used by this pass, only available after _load(). */
 		const GpuProgramPtr& getGeometryProgram(void) const;
 
@@ -1780,11 +1780,11 @@ namespace Ogre {
 		@remarks
 			Only applicable to programmable passes.
 		*/
-		void setTesselationHullProgramParameters(GpuProgramParametersSharedPtr params);
+		void setTesselationHullProgramParameters(const GpuProgramParametersSharedPtr& params);
 		/** Gets the name of the Tesselation Hull program used by this pass. */
 		const String& getTesselationHullProgramName(void) const;
 		/** Gets the Tesselation Hull program parameters used by this pass. */
-		GpuProgramParametersSharedPtr getTesselationHullProgramParameters(void) const;
+		const GpuProgramParametersSharedPtr& getTesselationHullProgramParameters(void) const;
 		/** Gets the Tesselation Hull program used by this pass, only available after _load(). */
 		const GpuProgramPtr& getTesselationHullProgram(void) const;
 
@@ -1809,11 +1809,11 @@ namespace Ogre {
 		@remarks
 			Only applicable to programmable passes.
 		*/
-		void setTesselationDomainProgramParameters(GpuProgramParametersSharedPtr params);
+		void setTesselationDomainProgramParameters(const GpuProgramParametersSharedPtr& params);
 		/** Gets the name of the Domain Evaluation program used by this pass. */
 		const String& getTesselationDomainProgramName(void) const;
 		/** Gets the Tesselation Domain program parameters used by this pass. */
-		GpuProgramParametersSharedPtr getTesselationDomainProgramParameters(void) const;
+		const GpuProgramParametersSharedPtr& getTesselationDomainProgramParameters(void) const;
 		/** Gets the Tesselation Domain program used by this pass, only available after _load(). */
 		const GpuProgramPtr& getTesselationDomainProgram(void) const;
 
@@ -1838,11 +1838,11 @@ namespace Ogre {
 		@remarks
 			Only applicable to programmable passes.
 		*/
-		void setComputeProgramParameters(GpuProgramParametersSharedPtr params);
+		void setComputeProgramParameters(const GpuProgramParametersSharedPtr& params);
 		/** Gets the name of the Tesselation Hull program used by this pass. */
 		const String& getComputeProgramName(void) const;
 		/** Gets the Tesselation Hull program parameters used by this pass. */
-		GpuProgramParametersSharedPtr getComputeProgramParameters(void) const;
+		const GpuProgramParametersSharedPtr& getComputeProgramParameters(void) const;
 		/** Gets the Tesselation EHull program used by this pass, only available after _load(). */
 		const GpuProgramPtr& getComputeProgram(void) const;
     };
