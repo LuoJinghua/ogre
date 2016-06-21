@@ -1206,7 +1206,8 @@ namespace Ogre {
 			else
 			{
 				// Just ensure existing pointer is loaded
-				mFramePtrs[frame]->load();
+				if (!mFramePtrs[frame]->isLoaded())
+					mFramePtrs[frame]->load();
 			}
 		}
 	}
