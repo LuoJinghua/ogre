@@ -103,7 +103,8 @@ namespace Ogre
         void setManuallyControlled(bool manuallyControlled);
 
         /** Getter for mManuallyControlled Flag */
-        bool isManuallyControlled() const;
+        bool isManuallyControlled() const { return mManuallyControlled; }
+
 
         
         /** Gets the transform which takes bone space to current from the binding pose. 

@@ -88,10 +88,6 @@ namespace Ogre {
 		mCreator->_notifyManualBoneStateChange(this);
     }
     //---------------------------------------------------------------------
-    bool Bone::isManuallyControlled() const {
-        return mManuallyControlled;
-    }
-    //---------------------------------------------------------------------
     void Bone::_getOffsetTransform(Matrix4& m) const
     {
         // Combine scale with binding pose inverse scale,
