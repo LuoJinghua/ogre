@@ -969,6 +969,7 @@ const Pass* SceneManager::_setPass(const Pass* pass, bool evenIfSuppressed,
 		if (pass->hasVertexProgram())
 		{
 			const GpuProgramPtr& program = pass->getVertexProgram();
+
 			bindGpuProgram(program->_getBindingDelegate());
 			// bind parameters later 
 			// does the vertex program want surface and light params passed to rendersystem?
@@ -1029,7 +1030,8 @@ const Pass* SceneManager::_setPass(const Pass* pass, bool evenIfSuppressed,
 		}
 
 
-		if (passSurfaceAndLightParams)
+		if (mDestRenderSystem->getFixedPipelineEnabled() &&
+			passSurfaceAndLightParams)
 		{
 			// Set surface reflectance properties, only valid if lighting is enabled
 			if (pass->getLightingEnabled())
@@ -1051,6 +1053,7 @@ const Pass* SceneManager::_setPass(const Pass* pass, bool evenIfSuppressed,
 		if (pass->hasFragmentProgram())
 		{
 			const GpuProgramPtr& program = pass->getFragmentProgram();
+
 			bindGpuProgram(program->_getBindingDelegate());
 			// bind parameters later 
 			passFogParams = program->getPassFogStates();
@@ -1133,14 +1136,17 @@ const Pass* SceneManager::_setPass(const Pass* pass, bool evenIfSuppressed,
 		}
 
 		// Set point parameters
-		mDestRenderSystem->_setPointParameters(
-			pass->getPointSize(),
-			pass->isPointAttenuationEnabled(), 
-			pass->getPointAttenuationConstant(), 
-			pass->getPointAttenuationLinear(), 
-			pass->getPointAttenuationQuadratic(), 
-			pass->getPointMinSize(), 
-			pass->getPointMaxSize());
+		if (mDestRenderSystem->getFixedPipelineEnabled())
+		{
+			mDestRenderSystem->_setPointParameters(
+				pass->getPointSize(),
+				pass->isPointAttenuationEnabled(), 
+				pass->getPointAttenuationConstant(), 
+				pass->getPointAttenuationLinear(), 
+				pass->getPointAttenuationQuadratic(), 
+				pass->getPointMinSize(), 
+				pass->getPointMaxSize());
+		}
 
 		if (mDestRenderSystem->getCapabilities()->hasCapability(RSC_POINT_SPRITES))
 			mDestRenderSystem->_setPointSpritesEnabled(pass->getPointSpritesEnabled());
