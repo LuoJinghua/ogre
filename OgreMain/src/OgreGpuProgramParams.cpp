@@ -1932,7 +1932,8 @@ namespace Ogre
 		mActivePassIterationIndex = std::numeric_limits<size_t>::max();
 
 		// Autoconstant index is not a physical index
-		for (AutoConstantList::const_iterator i = mAutoConstants.begin(); i != mAutoConstants.end(); ++i)
+		AutoConstantList::const_iterator i, iend = mAutoConstants.end();
+		for (i = mAutoConstants.begin(); i != iend; ++i)
 		{
 			// Only update needed slots
 			if (i->variability & mask)
