@@ -42,29 +42,41 @@ namespace Ogre {
     {
     protected:
         uint64 mBindings;
-        
+        HardwareVertexBufferSharedPtr mBuffers[sizeof(uint64) * 8];
+
     public:
         GLES2VertexBufferBinding() :
             mBindings(0)
         {
         }
 
+        const HardwareVertexBufferSharedPtr& getBuffer(unsigned short index) const
+        {
+            if (index >= sizeof(uint64) * 8)
+                return VertexBufferBinding::getBuffer(index);
+            return mBuffers[index];
+        }
+
         void setBinding(unsigned short index, const HardwareVertexBufferSharedPtr& buffer)
         {
             VertexBufferBinding::setBinding(index, buffer);
             mBindings |= uint64(1) << index;
+            mBuffers[index] = buffer;
         }
 
         void unsetBinding(unsigned short index)
         {
             VertexBufferBinding::unsetBinding(index);
             mBindings &= ~(uint64(1) << index);
+            mBuffers[index].setNull();
         }
 
         void unsetAllBindings(void)
         {
             VertexBufferBinding::unsetAllBindings();
             mBindings = 0;
+            for (size_t i = 0; i < sizeof(uint64) * 8; i++)
+                mBuffers[i].setNull();
         }
 
         bool isBufferBound(unsigned short index) const
@@ -75,11 +87,17 @@ namespace Ogre {
         void closeGaps(BindingIndexMap& bindingIndexMap)
         {
             VertexBufferBinding::closeGaps(bindingIndexMap);
-            
+
             mBindings = 0;
+            size_t i = 0;
             VertexBufferBindingMap::const_iterator it =  mBindingMap.begin();
             for (; it != mBindingMap.end(); ++it)
+            {
                 mBindings |= uint64(1) << it->first;
+                mBuffers[i++] = it->second;
+            }
+            for (; i < sizeof(uint64) * 8; i++)
+                mBuffers[i].setNull();
         }
     };
 
