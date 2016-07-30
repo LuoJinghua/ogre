@@ -350,13 +350,17 @@ namespace Ogre {
 			// in global pool flag - if true the resource will be loaded even a different	group was requested in the load method as a parameter.
 			bool inGlobalPool;
 
+            OGRE_MUTEX(indexMutex);
+
 			void addToIndex(const String& filename, Archive* arch);
 			void removeFromIndex(const String& filename, Archive* arch);
 			void removeFromIndex(Archive* arch);
 
+            ~ResourceGroup();
 		};
         /// Map from resource group names to groups
-        typedef map<String, ResourceGroup*>::type ResourceGroupMap;
+        typedef SharedPtr<ResourceGroup> ResourceGroupPtr;
+        typedef map<String, ResourceGroupPtr>::type ResourceGroupMap;
         ResourceGroupMap mResourceGroupMap;
 
         /// Group name for world resources
@@ -376,13 +380,13 @@ namespace Ogre {
 		/** Adds a created resource to a group. */
 		void addCreatedResource(ResourcePtr& res, ResourceGroup& group);
 		/** Get resource group */
-		ResourceGroup* getResourceGroup(const String& name);
+		ResourceGroupPtr getResourceGroup(const String& name);
 		/** Drops contents of a group, leave group there, notify ResourceManagers. */
-		void dropGroupContents(ResourceGroup* grp);
+		void dropGroupContents(const ResourceGroupPtr& grp);
 		/** Delete a group for shutdown - don't notify ResourceManagers. */
 		void deleteGroup(ResourceGroup* grp);
 		/// Internal find method for auto groups
-		ResourceGroup* findGroupContainingResourceImpl(const String& filename);
+		ResourceGroupPtr findGroupContainingResourceImpl(const String& filename);
 		/// Internal event firing method
 		void fireResourceGroupScriptingStarted(const String& groupName, size_t scriptCount);
 		/// Internal event firing method
@@ -420,8 +424,22 @@ namespace Ogre {
          */
         bool resourceExists(ResourceGroup* group, const String& filename);
 
+        /** Create the ThreadContext for the current thread
+         */
+        void ensureCurrentContext();
+
+        void setCurrentGroup(const ResourceGroupPtr& group);
+        void clearCurrentGroup();
+        const ResourceGroupPtr& getCurrentGroup();
+
 		/// Stored current group - optimisation for when bulk loading a group
-		ResourceGroup* mCurrentGroup;
+		//ResourceGroupPtr mCurrentGroup;
+        struct ThreadContext : ResourceAlloc
+        {
+            ResourceGroupPtr mCurrentGroup;
+        };
+        OGRE_THREAD_POINTER(ThreadContext, mCurrentContext);
+        OGRE_MUTEX(mListenerMutex);
     public:
         ResourceGroupManager();
         virtual ~ResourceGroupManager();
