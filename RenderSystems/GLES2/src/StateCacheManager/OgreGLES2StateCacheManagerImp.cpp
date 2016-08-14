@@ -580,6 +580,8 @@ namespace Ogre {
 
         mEnabledVertexAttribs.erase(vao);
         OGRE_CHECK_GL_ERROR(glDeleteVertexArraysOES(1, &vao));
+        if (mActiveVertexArray == vao)
+            mActiveVertexArray = 0;
     }
 
     GLuint GLES2StateCacheManagerImp::getActiveVertexArray()
