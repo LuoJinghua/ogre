@@ -107,9 +107,11 @@ namespace Ogre {
 		mManager->releaseRenderBuffer(mMultisampleColourBuffer);
         
         OGRE_CHECK_GL_ERROR(glDeleteFramebuffers(1, &mFB));
-        
+        mFB = 0;
+
 		if (mMultisampleFB)
 			OGRE_CHECK_GL_ERROR(glDeleteFramebuffers(1, &mMultisampleFB));
+        mMultisampleFB = 0;
     }
     
     void GLES2FrameBufferObject::notifyOnContextReset(const GLES2SurfaceDesc &target)

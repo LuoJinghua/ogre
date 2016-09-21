@@ -75,6 +75,7 @@ void GLES2HardwareOcclusionQuery::destroyQuery()
     if(getGLES2SupportRef()->checkExtension("GL_EXT_occlusion_query_boolean") || gleswIsSupported(3, 0))
     {
         OGRE_CHECK_GL_ERROR(glDeleteQueriesEXT(1, &mQueryID));
+        mQueryID = 0;
     }
 }
 //------------------------------------------------------------------

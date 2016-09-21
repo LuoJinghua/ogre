@@ -84,6 +84,7 @@ namespace Ogre {
     {
 		// Delete the cached value
         static_cast<GLES2HardwareBufferManagerBase*>(mMgr)->getStateCacheManager()->deleteGLBuffer(GL_ELEMENT_ARRAY_BUFFER, mBufferId);
+        mBufferId = 0;
     }
     
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID
