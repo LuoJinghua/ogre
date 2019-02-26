@@ -44,6 +44,7 @@ namespace Ogre {
     : mVertexProgram(vertexProgram)
     , mFragmentProgram(fragmentProgram)
     , mUniformRefsBuilt(false)
+    , mGLProgramHandle(0)
     , mLinked(false)
     , mTriedToLinkAndFailed(false)
 	{
@@ -80,7 +81,8 @@ namespace Ogre {
 	//-----------------------------------------------------------------------
 	GLSLESProgramCommon::~GLSLESProgramCommon(void)
 	{
-		OGRE_CHECK_GL_ERROR(glDeleteProgram(mGLProgramHandle));
+		if (mGLProgramHandle)
+			OGRE_CHECK_GL_ERROR(glDeleteProgram(mGLProgramHandle));
 
         delete mUniformCache;
         mUniformCache = 0;
