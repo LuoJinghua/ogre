@@ -506,9 +506,11 @@ namespace Ogre{
 		CreateMaterialScriptCompilerEvent evt(node->file, obj->name, compiler->getResourceGroup());
 		bool processed = compiler->_fireEvent(&evt, (void*)&mMaterial);
 
+		ResourcePtr material;
 		if(!processed)
 		{
-			mMaterial = reinterpret_cast<Ogre::Material*>(MaterialManager::getSingleton().create(obj->name, compiler->getResourceGroup()).get());
+			material = MaterialManager::getSingleton().create(obj->name, compiler->getResourceGroup());
+			mMaterial = reinterpret_cast<Ogre::Material*>(material.get());
 		}
 		else
 		{
