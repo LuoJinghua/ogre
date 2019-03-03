@@ -170,7 +170,7 @@ extern "C"
 				if (!gRenderWnd) 
 				{
 					Ogre::NameValuePairList opt;
-					opt["externalWindowHandle"] = Ogre::StringConverter::toString((int)nativeWnd);
+					opt["externalWindowHandle"] = Ogre::StringConverter::toString((size_t)nativeWnd);
 					gRenderWnd = Ogre::Root::getSingleton().createRenderWindow("OgreWindow", 0, 0, false, &opt);
 					
 					

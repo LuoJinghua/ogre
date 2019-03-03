@@ -147,19 +147,19 @@ namespace Ogre {
             
             if((opt = miscParams->find("externalWindowHandle")) != end)
             {
-                mWindow = (ANativeWindow*)(Ogre::StringConverter::parseInt(opt->second));
+                mWindow = (ANativeWindow*)(Ogre::StringConverter::parseUnsignedLong(opt->second));
             }
             
             if((opt = miscParams->find("androidConfig")) != end)
             {
-                config = (AConfiguration*)(Ogre::StringConverter::parseInt(opt->second));
+                config = (AConfiguration*)(Ogre::StringConverter::parseUnsignedLong(opt->second));
             }
             
             int ctxHandle = -1;
             if((miscParams->find("externalGLContext")) != end)
             {
                 mIsExternalGLControl = true;
-                ctxHandle = Ogre::StringConverter::parseInt(opt->second);
+                ctxHandle = Ogre::StringConverter::parseUnsignedLong(opt->second);
             }
 			
 			if((opt = miscParams->find("maxColourBufferSize")) != end)
@@ -243,8 +243,11 @@ namespace Ogre {
         mContext->endCurrent();
         mContext->setDrawable(EGL_NO_SURFACE);
 
-        eglDestroySurface(mEglDisplay, mEglSurface);
-        EGL_CHECK_ERROR
+        if (mEglSurface != EGL_NO_SURFACE)
+        {
+            eglDestroySurface(mEglDisplay, mEglSurface);
+            EGL_CHECK_ERROR
+        }
 
         mEglSurface = 0;
 

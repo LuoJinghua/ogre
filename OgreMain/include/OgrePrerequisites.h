@@ -72,8 +72,13 @@ namespace Ogre {
 
     #if OGRE_COMPILER == OGRE_COMPILER_GNUC && OGRE_COMP_VER >= 310 && !defined(STLPORT)
 	#   if OGRE_COMP_VER >= 430
-	#       define HashMap ::std::tr1::unordered_map
-	#       define HashSet ::std::tr1::unordered_set
+	#       if __cplusplus >= 201103L
+	#          define HashMap ::std::unordered_map
+	#          define HashSet ::std::unordered_set
+	#       else
+	#          define HashMap ::std::tr1::unordered_map
+	#          define HashSet ::std::tr1::unordered_set
+	#       endif
 	#    else
 	#       define HashMap ::__gnu_cxx::hash_map
 	#       define HashSet ::__gnu_cxx::hash_set

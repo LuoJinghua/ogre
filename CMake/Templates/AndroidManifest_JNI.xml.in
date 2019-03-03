@@ -2,13 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.ogre3d.jni"
     android:versionCode="1"
-    android:versionName="1.0" 
+    android:versionName="1.0"
 	android:installLocation="auto">
 
-    <uses-sdk android:minSdkVersion="@ANDROID_NATIVE_API_LEVEL@" /> 
+    <uses-sdk android:minSdkVersion="15" /> 
 
     <application android:label="@ANDROID_MOD_NAME@" android:hasCode="true">
-        <activity android:name="org.ogre3d.android.MainActivity" 
+        <activity android:name="org.ogre3d.android.MainActivity"
                   android:label="@ANDROID_MOD_NAME@"
                   android:configChanges="orientation@SCREEN_SIZE@|keyboardHidden"
 		   android:debuggable="true"
@@ -17,7 +17,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity> 
+        </activity>
     </application>
 
 </manifest>

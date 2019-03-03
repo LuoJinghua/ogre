@@ -2,12 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="org.ogre3d.browser"
     android:versionCode="1"
-    android:versionName="1.0" 
+    android:versionName="1.0"
 	android:installLocation="auto">
 
-    <uses-sdk android:minSdkVersion="@ANDROID_NATIVE_API_LEVEL@" />
+    <uses-sdk android:minSdkVersion="15" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.INTERNET" /> 
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- This .apk has no Java code itself, so set hasCode to false. -->
     <application android:label="OgreSampleBrowser" android:icon="@drawable/ic_launcher" android:hasCode="false">
@@ -22,7 +22,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity> 
+        </activity>
     </application>
 
 </manifest>

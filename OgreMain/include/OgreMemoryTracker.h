@@ -43,7 +43,11 @@ THE SOFTWARE.
 // We need to define a hash function for void*
 // For gcc 4.3 see http://gcc.gnu.org/gcc-4.3/changes.html
 #   if OGRE_COMP_VER >= 430
-#       include <tr1/unordered_map>
+#       if __cplusplus >= 201103L
+#           include <unordered_map>
+#       else
+#           include <tr1/unordered_map>
+#       endif
 #   else
 #       include <ext/hash_map>
 namespace __gnu_cxx

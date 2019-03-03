@@ -36,6 +36,7 @@ endmacro(getenv_path)
 
 # Construct search paths for includes and libraries from a PREFIX_PATH
 macro(create_search_paths PREFIX)
+  set(${PREFIX}_INC_SEARCH_PATH ${OGRE_DEPENDENCIES_DIR}/include)
   foreach(dir ${${PREFIX}_PREFIX_PATH})
     set(${PREFIX}_INC_SEARCH_PATH ${${PREFIX}_INC_SEARCH_PATH}
       ${dir}/include ${dir}/Include ${dir}/include/${PREFIX} ${dir}/Headers)

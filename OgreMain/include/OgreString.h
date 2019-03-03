@@ -36,7 +36,11 @@ THE SOFTWARE.
 
 // For gcc 4.3 see http://gcc.gnu.org/gcc-4.3/changes.html
 #   if OGRE_COMP_VER >= 430
-#       include <tr1/unordered_map> 
+#      if __cplusplus >= 201103L
+#         include <unordered_map>
+#      else
+#         include <tr1/unordered_map>
+#      endif
 #   else
 #       include <ext/hash_map>
 namespace __gnu_cxx
@@ -201,7 +205,11 @@ namespace Ogre {
 #   if OGRE_COMP_VER < 430
 	typedef ::__gnu_cxx::hash< _StringBase > _StringHash;
 #   else
+#      if __cplusplus >= 201103L
+         typedef ::std::hash< _StringBase > _StringHash;
+#      else
 	typedef ::std::tr1::hash< _StringBase > _StringHash;
+#      endif
 #   endif
 #elif OGRE_COMPILER == OGRE_COMPILER_CLANG
 #   if defined(_LIBCPP_VERSION)

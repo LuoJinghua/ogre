@@ -183,6 +183,7 @@ namespace Ogre {
 	//-----------------------------------------------------------------------
 	void ResourceManager::removeImpl( ResourcePtr& res )
 	{
+        {
             OGRE_LOCK_AUTO_MUTEX;
 
 		if(ResourceGroupManager::getSingleton().isResourceGroupInGlobalPool(res->getGroup()))
@@ -216,6 +217,7 @@ namespace Ogre {
 		{
 			mResourcesByHandle.erase(handleIt);
 		}
+        }
 		// Tell resource group manager
 		ResourceGroupManager::getSingleton()._notifyResourceRemoved(res);
 	}

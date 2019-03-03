@@ -49,7 +49,7 @@ endif()
 message(STATUS "Search path: ${OGRE_DEP_SEARCH_PATH}")
 
 # Set hardcoded path guesses for various platforms
-if (UNIX)
+if (UNIX AND NOT ANDROID)
   set(OGRE_DEP_SEARCH_PATH ${OGRE_DEP_SEARCH_PATH} /usr/local)
   # Ubuntu 11.10 has an inconvenient path to OpenGL libraries
   set(OGRE_DEP_SEARCH_PATH ${OGRE_DEP_SEARCH_PATH} /usr/lib/${CMAKE_SYSTEM_PROCESSOR}-linux-gnu)
@@ -58,6 +58,16 @@ endif ()
 # give guesses as hints to the find_package calls
 set(CMAKE_PREFIX_PATH ${OGRE_DEP_SEARCH_PATH} ${CMAKE_PREFIX_PATH})
 set(CMAKE_FRAMEWORK_PATH ${OGRE_DEP_SEARCH_PATH} ${CMAKE_FRAMEWORK_PATH})
+
+if (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANGXX)
+  MESSAGE(STATUS "Compiler Version: ${CMAKE_CXX_COMPILER_VERSION}")
+  if ("${CMAKE_CXX_COMPILER_VERSION}" STREQUAL "")
+    # determine gcc version
+    execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
+      OUTPUT_VARIABLE CMAKE_CXX_COMPILER_VERSION)
+    message(STATUS "Detected c++ compiler ${CMAKE_CXX_COMPILER_VERSION}")
+  endif()
+endif()
 
 #######################################################################
 # Core dependencies
@@ -139,6 +149,9 @@ endif ()
 
 # Find Boost
 # Prefer static linking in all cases
+if (ANDROID)
+  SET(BOOST_LIBRARYDIR ${OGRE_DEPENDENCIES_DIR}/lib/${ANDROID_ABI})
+endif()
 if (WIN32 OR APPLE)
 	set(Boost_USE_STATIC_LIBS TRUE)
 else ()
@@ -148,7 +161,7 @@ endif ()
 if (APPLE AND OGRE_BUILD_PLATFORM_APPLE_IOS)
     set(Boost_USE_MULTITHREADED OFF)
 endif()
-set(Boost_ADDITIONAL_VERSIONS "1.57" "1.57.0" "1.56" "1.56.0" "1.55" "1.55.0" "1.54" "1.54.0" "1.53" "1.53.0" "1.52" "1.52.0" "1.51" "1.51.0" "1.50" "1.50.0" "1.49" "1.49.0" "1.48" "1.48.0" "1.47" "1.47.0" "1.46" "1.46.0" "1.45" "1.45.0" "1.44" "1.44.0" "1.42" "1.42.0" "1.41.0" "1.41" "1.40.0" "1.40")
+set(Boost_ADDITIONAL_VERSIONS "1.69.0" "1.68.0" "1.67.0" "1.57" "1.57.0" "1.56" "1.56.0" "1.55" "1.55.0" "1.54" "1.54.0" "1.53" "1.53.0" "1.52" "1.52.0" "1.51" "1.51.0" "1.50" "1.50.0" "1.49" "1.49.0" "1.48" "1.48.0" "1.47" "1.47.0" "1.46" "1.46.0" "1.45" "1.45.0" "1.44" "1.44.0" "1.42" "1.42.0" "1.41.0" "1.41" "1.40.0" "1.40")
 # Components that need linking (NB does not include header-only components like bind)
 set(OGRE_BOOST_COMPONENTS thread date_time)
 find_package(Boost COMPONENTS ${OGRE_BOOST_COMPONENTS} QUIET)
